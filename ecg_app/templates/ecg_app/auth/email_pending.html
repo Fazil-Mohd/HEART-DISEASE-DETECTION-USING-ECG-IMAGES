@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% block title %}Verify Your Email — CardioVision AI{% endblock %}
+
+{% block content %}
+<style>
+  .verify-wrap {
+    min-height: 78vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0c4a6e 100%);
+  }
+  .verify-card {
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.22);
+    padding: 3rem 2.5rem;
+    max-width: 520px;
+    width: 100%;
+    text-align: center;
+    animation: slideUp 0.5s ease both;
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .envelope-icon {
+    width: 88px;
+    height: 88px;
+    background: linear-gradient(135deg, #0c4a6e, #0ea5e9);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    font-size: 2.5rem;
+    animation: pulse 2.4s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(14,165,233,0.4); }
+    50%       { box-shadow: 0 0 0 16px rgba(14,165,233,0); }
+  }
+  .verify-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 0.5rem;
+  }
+  .verify-subtitle {
+    font-size: 0.95rem;
+    color: #64748b;
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+  }
+  .email-highlight {
+    display: inline-block;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    padding: 0.4rem 1rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+    word-break: break-all;
+  }
+  .steps-list {
+    text-align: left;
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.75rem;
+    border: 1px solid #e2e8f0;
+  }
+  .steps-list li {
+    font-size: 0.9rem;
+    color: #475569;
+    margin-bottom: 0.5rem;
+    padding-left: 0.25rem;
+  }
+  .steps-list li:last-child { margin-bottom: 0; }
+  .step-icon { margin-right: 0.4rem; }
+  .btn-resend {
+    display: inline-block;
+    background: linear-gradient(135deg, #0c4a6e, #0ea5e9);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 0.75rem 2rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity 0.2s, transform 0.2s;
+    width: 100%;
+    margin-bottom: 0.75rem;
+  }
+  .btn-resend:hover { opacity: 0.88; transform: translateY(-2px); color: #fff; }
+  .btn-login-link {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    display: block;
+    margin-top: 0.25rem;
+  }
+  .btn-login-link a { color: #0ea5e9; text-decoration: none; }
+  .btn-login-link a:hover { text-decoration: underline; }
+  .expiry-note {
+    font-size: 0.78rem;
+    color: #f59e0b;
+    margin-top: 1rem;
+  }
+</style>
+
+<div class="verify-wrap">
+  <div class="verify-card">
+
+    <!-- Icon -->
+    <div class="envelope-icon">✉️</div>
+
+    <h1 class="verify-title">Check Your Inbox</h1>
+    <p class="verify-subtitle">
+      We've sent a verification link to your email address.
+      Click the link to activate your CardioVision AI account.
+    </p>
+
+    {% if email %}
+      <div class="email-highlight">{{ email }}</div>
+    {% endif %}
+
+    <!-- Steps -->
+    <ul class="steps-list">
+      <li><span class="step-icon">📬</span>Open the email from <strong>CardioVision AI</strong></li>
+      <li><span class="step-icon">🔗</span>Click the <strong>"Verify My Email Address"</strong> button</li>
+      <li><span class="step-icon">🎉</span>You'll be automatically logged in</li>
+      <li><span class="step-icon">🗂️</span>If you don't see it, check your <strong>Spam / Junk</strong> folder</li>
+    </ul>
+
+    <!-- Resend form -->
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} mb-3" role="alert">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <form method="post" action="{% url 'resend_verification' %}">
+      {% csrf_token %}
+      <input type="hidden" name="username" id="resendUsername" value="">
+      <button type="submit" class="btn-resend"
+              onclick="setUsernameFromEmail()">
+        📨 Resend Verification Email
+      </button>
+    </form>
+
+    <p class="btn-login-link">
+      Already verified? <a href="{% url 'login' %}">Log in here</a>
+    </p>
+
+    <p class="expiry-note">⚠️ Verification links expire after <strong>24 hours</strong>.</p>
+  </div>
+</div>
+
+<script>
+  // Try to populate username from session via hidden input if available
+  function setUsernameFromEmail() {
+    // The POST will work even without username (server handles it gracefully)
+  }
+</script>
+{% endblock %}
