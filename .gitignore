@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.keras
+*.h5
+*.keras
+*.pt
+*.pth
+*.onnx
+
+# Data and Models
+data/
+media/
+resnet_models/
+sample\ data/
+*.webp
+*.mp4
+*.pdf
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# VS Code
+.vscode/
+
+# Django
+db.sqlite3
+*.log
+
+# Misc
+.DS_Store
