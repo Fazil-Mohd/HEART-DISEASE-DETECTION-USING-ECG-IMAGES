@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+{% block title %}
+  {% if success %}Email Verified{% elif error_type == 'expired' %}Link Expired{% else %}Invalid Link{% endif %} — CardioVision AI
+{% endblock %}
+
+{% block content %}
+<style>
+  .result-wrap {
+    min-height: 78vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0c4a6e 100%);
+  }
+  .result-card {
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.22);
+    padding: 3rem 2.5rem;
+    max-width: 480px;
+    width: 100%;
+    text-align: center;
+    animation: pop 0.45s cubic-bezier(.34,1.56,.64,1) both;
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: scale(0.88); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  .status-icon {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    font-size: 3rem;
+  }
+  .icon-success { background: linear-gradient(135deg, #10b981, #059669); }
+  .icon-expired { background: linear-gradient(135deg, #f59e0b, #d97706); }
+  .icon-invalid { background: linear-gradient(135deg, #ef4444, #dc2626); }
+
+  .result-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.6rem;
+  }
+  .title-success { color: #065f46; }
+  .title-expired { color: #92400e; }
+  .title-invalid { color: #991b1b; }
+
+  .result-body {
+    font-size: 0.95rem;
+    color: #475569;
+    line-height: 1.7;
+    margin-bottom: 1.75rem;
+  }
+
+  /* Success confetti strip */
+  .confetti-strip {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 1.25rem;
+    font-size: 1.5rem;
+  }
+
+  .btn-primary-action {
+    display: inline-block;
+    background: linear-gradient(135deg, #0c4a6e, #0ea5e9);
+    color: #fff !important;
+    border-radius: 10px;
+    padding: 0.8rem 2.2rem;
+    font-size: 0.96rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.2s, transform 0.15s;
+    width: 100%;
+    margin-bottom: 0.75rem;
+  }
+  .btn-primary-action:hover { opacity: 0.87; transform: translateY(-2px); }
+
+  .btn-secondary-action {
+    display: inline-block;
+    background: #f1f5f9;
+    color: #334155 !important;
+    border-radius: 10px;
+    padding: 0.75rem 2rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background 0.2s;
+    width: 100%;
+  }
+  .btn-secondary-action:hover { background: #e2e8f0; }
+
+  .redirect-note {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    margin-top: 1rem;
+  }
+
+  .resend-form { margin-top: 0.6rem; }
+  .resend-form input[type="text"] {
+    width: 100%;
+    padding: 0.65rem 1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    margin-bottom: 0.6rem;
+  }
+  .btn-resend-sm {
+    width: 100%;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn-resend-sm:hover { opacity: 0.87; }
+</style>
+
+<div class="result-wrap">
+  <div class="result-card">
+
+    {% if success %}
+      <!-- ── SUCCESS ── -->
+      <div class="status-icon icon-success">✅</div>
+      <div class="confetti-strip">🎉 🥳 🎊 🎉</div>
+      <h1 class="result-title title-success">Email Verified!</h1>
+      <p class="result-body">
+        {% if user %}
+          Welcome, <strong>{{ user.first_name|default:user.username }}</strong>!
+        {% endif %}
+        Your email address has been confirmed and your
+        <strong>CardioVision AI</strong> account is now fully active.
+        You're now logged in.
+      </p>
+
+      <a href="{% url 'dashboard' %}" class="btn-primary-action">
+        🏠 Go to Dashboard
+      </a>
+      <p class="redirect-note">You'll be redirected automatically in <span id="countdown">5</span>s.</p>
+
+      <script>
+        let s = 5;
+        const el = document.getElementById('countdown');
+        const iv = setInterval(() => {
+          s--;
+          el.textContent = s;
+          if (s <= 0) { clearInterval(iv); window.location.href = "{% url 'dashboard' %}"; }
+        }, 1000);
+      </script>
+
+    {% elif error_type == 'expired' %}
+      <!-- ── EXPIRED ── -->
+      <div class="status-icon icon-expired">⏰</div>
+      <h1 class="result-title title-expired">Link Expired</h1>
+      <p class="result-body">
+        This verification link has expired. Links are valid for <strong>24 hours</strong>
+        after registration. Enter your username below to receive a fresh link.
+      </p>
+
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} mb-3">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+
+      <form method="post" action="{% url 'resend_verification' %}" class="resend-form">
+        {% csrf_token %}
+        <input type="text" name="username" placeholder="Enter your username"
+               value="{{ user.username|default:'' }}" required>
+        <button type="submit" class="btn-resend-sm">📨 Resend Verification Email</button>
+      </form>
+
+      <a href="{% url 'register' %}" class="btn-secondary-action" style="margin-top:0.6rem;">
+        ↩ Register Again
+      </a>
+
+    {% else %}
+      <!-- ── INVALID ── -->
+      <div class="status-icon icon-invalid">❌</div>
+      <h1 class="result-title title-invalid">Invalid Link</h1>
+      <p class="result-body">
+        This verification link is invalid or has already been used.
+        Please register again or contact support if you believe this is an error.
+      </p>
+
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} mb-3">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+
+      <a href="{% url 'register' %}" class="btn-primary-action">
+        ✏️ Register Again
+      </a>
+      <a href="{% url 'login' %}" class="btn-secondary-action" style="margin-top:0.6rem;">
+        Already have an account? Log in
+      </a>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
