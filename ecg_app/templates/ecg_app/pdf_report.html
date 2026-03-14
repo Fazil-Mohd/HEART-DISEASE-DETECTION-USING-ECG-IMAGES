@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>ECG Analysis Report - {{ record.id }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+            @top-right {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 9pt;
+                color: #666;
+            }
+        }
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #333;
+            line-height: 1.5;
+            font-size: 11pt;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #0369a1;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #0c4a6e;
+            margin: 0 0 5px 0;
+            font-size: 24pt;
+        }
+        .header p {
+            color: #64748b;
+            margin: 0;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section-title {
+            color: #0f172a;
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+            font-size: 16pt;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .table th, .table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .table th {
+            color: #475569;
+            font-weight: 600;
+            width: 40%;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            font-size: 10pt;
+        }
+        .badge-danger { background-color: #ef4444; }
+        .badge-warning { background-color: #f59e0b; }
+        .badge-success { background-color: #10b981; }
+        
+        .img-container {
+            text-align: center;
+            margin: 20px 0;
+            page-break-inside: avoid;
+        }
+        .img-container img {
+            max-width: 100%;
+            max-height: 400px;
+            border: 1px solid #cbd5e1;
+            padding: 5px;
+        }
+        
+        .lime-grid {
+            display: table;
+            width: 100%;
+            margin-top: 15px;
+            page-break-inside: avoid;
+        }
+        .lime-row {
+            display: table-row;
+        }
+        .lime-cell {
+            display: table-cell;
+            width: 50%;
+            padding: 10px;
+            text-align: center;
+        }
+        .lime-cell img {
+            max-width: 100%;
+            border: 1px solid #cbd5e1;
+        }
+        .lime-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #334155;
+        }
+        
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 9pt;
+            color: #94a3b8;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>CardioVision AI</h1>
+        <p>Automated ECG Analysis &amp; Explainability Report</p>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Patient &amp; Record Details</h2>
+        <table class="table">
+            <tr>
+                <th>Record ID</th>
+                <td>#{{ record.id }}</td>
+            </tr>
+            <tr>
+                <th>Upload Date</th>
+                <td>{{ record.upload_date|date:"F j, Y, g:i a" }}</td>
+            </tr>
+            <tr>
+                <th>Primary Diagnosis</th>
+                <td>
+                    {% if record.predicted_category == 'normal' %}
+                        <span class="badge badge-success">Normal</span>
+                    {% elif record.predicted_category == 'abnormal' %}
+                        <span class="badge badge-warning">Abnormal</span>
+                    {% else %}
+                        <span class="badge badge-danger">{{ record.predicted_category|title }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th>AI Confidence</th>
+                <td>{{ record.confidence|floatformat:1 }}%</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section img-container">
+        <h2 class="section-title">Original ECG Image</h2>
+        <img src="{{ original_image_url }}" alt="Original ECG">
+    </div>
+
+    {% if lime_ready %}
+    <!-- Page Break before LIME to keep them together -->
+    <div style="page-break-before: always;"></div>
+    
+    <div class="section">
+        <h2 class="section-title">Explainable AI (LIME) Analysis</h2>
+        <p style="font-size: 10pt; color: #64748b; margin-bottom: 15px;">
+            The images below highlight the regions of the ECG that influenced the AI model's decision for each class.
+            <strong>Green areas</strong> strongly support the corresponding diagnosis, while <strong>Red areas</strong> contradict it.
+        </p>
+
+        <div class="lime-grid">
+            <div class="lime-row">
+                <div class="lime-cell">
+                    <div class="lime-title">Predicted: {{ record.predicted_category|title }}</div>
+                    {% if record.predicted_category == 'abnormal' and lime_abnormal %}<img src="{{ lime_abnormal }}">
+                    {% elif record.predicted_category == 'mi' and lime_mi %}<img src="{{ lime_mi }}">
+                    {% elif record.predicted_category == 'normal' and lime_normal %}<img src="{{ lime_normal }}">
+                    {% elif record.predicted_category == 'post_mi' and lime_post_mi %}<img src="{{ lime_post_mi }}">
+                    {% else %}<p>Explanation not generated</p>{% endif %}
+                </div>
+                <div class="lime-cell">
+                    <div class="lime-title">Alternative: {% if record.predicted_category != 'normal' %}Normal{% else %}Abnormal{% endif %}</div>
+                    {% if record.predicted_category != 'normal' and lime_normal %}<img src="{{ lime_normal }}">
+                    {% elif record.predicted_category == 'normal' and lime_abnormal %}<img src="{{ lime_abnormal }}">
+                    {% else %}<p>Explanation not generated</p>{% endif %}
+                </div>
+            </div>
+            <div class="lime-row">
+                <div class="lime-cell">
+                    <div class="lime-title">Alternative: Myocardial Infarction</div>
+                    {% if lime_mi %}<img src="{{ lime_mi }}">{% else %}<p>Not generated</p>{% endif %}
+                </div>
+                <div class="lime-cell">
+                    <div class="lime-title">Alternative: Post MI</div>
+                    {% if lime_post_mi %}<img src="{{ lime_post_mi }}">{% else %}<p>Not generated</p>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <p>This report was automatically generated by CardioVision AI.</p>
+        <p><strong>Disclaimer:</strong> This is an AI-assisted analysis tool and should not be used as a substitute for professional medical diagnosis.</p>
+    </div>
+
+</body>
+</html>

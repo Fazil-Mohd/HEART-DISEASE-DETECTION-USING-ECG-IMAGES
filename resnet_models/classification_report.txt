@@ -1,0 +1,13 @@
+Validation Loss : 0.3819
+Validation Acc  : 0.8495
+
+              precision    recall  f1-score   support
+
+    abnormal     0.8511    0.8511    0.8511        47
+          mi     0.8276    1.0000    0.9057        48
+      normal     0.8246    0.8246    0.8246        57
+     post_mi     0.9583    0.6765    0.7931        34
+
+    accuracy                         0.8495       186
+   macro avg     0.8654    0.8380    0.8436       186
+weighted avg     0.8565    0.8495    0.8464       186

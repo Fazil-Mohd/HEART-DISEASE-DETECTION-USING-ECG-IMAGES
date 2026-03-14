@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile - ECG Analyzer{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <div class="avatar-circle bg-primary text-white d-inline-flex align-items-center justify-content-center rounded-circle" 
+                             style="width: 100px; height: 100px; font-size: 2.5rem;">
+                            {{ user.username|first|upper }}
+                        </div>
+                    </div>
+                    <h4>{{ user.get_full_name|default:user.username }}</h4>
+                    <p class="text-muted">@{{ user.username }}</p>
+                    
+                    <div class="list-group list-group-flush mt-3">
+                        <a href="{% url 'profile' %}" class="list-group-item list-group-item-action active">
+                            <i class="fas fa-user me-2"></i> Profile Information
+                        </a>
+                        <a href="{% url 'dashboard' %}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                        </a>
+                        <a href="{% url 'history' %}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-history me-2"></i> ECG History
+                        </a>
+                        <a href="{% url 'password_change' %}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-key me-2"></i> Change Password
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h6 class="card-title">Account Status</h6>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Member Since:</span>
+                        <strong>{{ user.date_joined|date:"M d, Y" }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Last Login:</span>
+                        <strong>{{ user.last_login|date:"M d, Y H:i"|default:"Never" }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Total ECGs:</span>
+                        <strong>{{ total_ecgs }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Account Type:</span>
+                        <strong>
+                            {% if user.is_superuser %}
+                            <span class="badge bg-danger">Administrator</span>
+                            {% else %}
+                            <span class="badge bg-success">Standard User</span>
+                            {% endif %}
+                        </strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-white border-0">
+                    <h4 class="mb-0">
+                        <i class="fas fa-user-edit me-2"></i>Profile Information
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {% csrf_token %}
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Username</label>
+                                {{ user_form.username }}
+                                {% if user_form.username.errors %}
+                                <div class="text-danger small">
+                                    {{ user_form.username.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email</label>
+                                {{ user_form.email }}
+                                {% if user_form.email.errors %}
+                                <div class="text-danger small">
+                                    {{ user_form.email.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">First Name</label>
+                                {{ user_form.first_name }}
+                                {% if user_form.first_name.errors %}
+                                <div class="text-danger small">
+                                    {{ user_form.first_name.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Last Name</label>
+                                {{ user_form.last_name }}
+                                {% if user_form.last_name.errors %}
+                                <div class="text-danger small">
+                                    {{ user_form.last_name.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Your profile information is used to personalize your experience.
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i> Back to Dashboard
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i> Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Account Statistics -->
+            <div class="card mt-4">
+                <div class="card-header bg-white border-0">
+                    <h4 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Account Statistics
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3 mb-3">
+                            <div class="metric-card bg-light p-3 rounded">
+                                <h3 class="text-primary" id="totalECGs">{{ total_ecgs|default:"0" }}</h3>
+                                <p class="mb-0 text-muted">Total ECGs</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="metric-card bg-light p-3 rounded">
+                                <h3 class="text-success" id="normalECGs">{{ normal_ecgs|default:"0" }}</h3>
+                                <p class="mb-0 text-muted">Normal Results</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="metric-card bg-light p-3 rounded">
+                                <h3 class="text-warning" id="abnormalECGs">{{ abnormal_ecgs|default:"0" }}</h3>
+                                <p class="mb-0 text-muted">Abnormal Results</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="metric-card bg-light p-3 rounded">
+                                <h3 class="text-info" id="successRate">{{ success_rate|default:"0" }}%</h3>
+                                <p class="mb-0 text-muted">Success Rate</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Activity -->
+            <div class="card mt-4">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <i class="fas fa-history me-2"></i>Recent Activity
+                    </h4>
+                    <a href="{% url 'history' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-icon">
+                                <i class="fas fa-user-plus text-success"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <h6>Account Created</h6>
+                                <p class="text-muted small mb-0">{{ user.date_joined|date:"F d, Y H:i" }}</p>
+                            </div>
+                        </div>
+                        
+                        {% for ecg in recent_ecgs %}
+                        <div class="timeline-item">
+                            <div class="timeline-icon">
+                                <i class="fas fa-upload text-primary"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <h6>ECG Analysis: {{ ecg.get_predicted_category_display }}</h6>
+                                <p class="text-muted small mb-0">
+                                    {{ ecg.upload_date|date:"F d, Y H:i" }}
+                                    {% if ecg.confidence %}
+                                    <span class="badge bg-info ms-2">{{ ecg.confidence|floatformat:1 }}% confidence</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="timeline-item">
+                            <div class="timeline-icon">
+                                <i class="fas fa-upload text-secondary"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <h6>No ECG analyses yet</h6>
+                                <p class="text-muted small mb-0">Upload your first ECG to get started</p>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.avatar-circle {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    font-weight: bold;
+}
+
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e2e8f0;
+}
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+    min-height: 40px;
+}
+.timeline-icon {
+    position: absolute;
+    left: -30px;
+    top: 0;
+    width: 30px;
+    height: 30px;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #e2e8f0;
+    z-index: 1;
+}
+.timeline-content {
+    padding-left: 15px;
+}
+.timeline-content h6 {
+    margin-bottom: 5px;
+    font-size: 0.95rem;
+}
+.metric-card {
+    transition: transform 0.3s ease;
+}
+.metric-card:hover {
+    transform: translateY(-5px);
+}
+</style>
+
+<script>
+// Optional: Auto-refresh statistics every 30 seconds
+setTimeout(function() {
+    window.location.reload();
+}, 30000);
+</script>
+{% endblock %}

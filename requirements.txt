@@ -1,0 +1,43 @@
+# ──────────────────────────────────────────────────────────────
+#  ECG Heart Disease Detection — Requirements
+#  Install with:  pip install -r requirements.txt
+# ──────────────────────────────────────────────────────────────
+
+# Deep Learning
+tensorflow==2.20.0
+keras==3.12.1
+
+# ML / Data Science
+scikit-learn==1.7.2
+scipy==1.15.3
+numpy==2.2.6
+pandas==2.3.3
+
+# Explainability (LIME)
+lime==0.2.0.1
+scikit-image>=0.19
+
+# Image Processing
+Pillow==12.1.1
+opencv-python==4.13.0.92
+
+# Visualisation
+matplotlib==3.10.8
+seaborn==0.13.2
+
+# Web Framework (Django app)
+Django==5.2.11
+asgiref==3.11.1
+sqlparse==0.5.5
+
+# HTTP / Utilities
+requests==2.32.5
+urllib3==2.6.3
+
+# TensorBoard (optional — for monitoring training)
+tensorboard==2.20.0
+
+# Task Queue & PDF Generation
+celery==5.3.6
+redis==5.0.1
+weasyprint==61.0

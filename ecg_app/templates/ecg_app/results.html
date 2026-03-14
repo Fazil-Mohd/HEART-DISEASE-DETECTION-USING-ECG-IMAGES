@@ -1,0 +1,546 @@
+{% extends 'base.html' %}
+
+{% block title %}ECG Results - ECG Analyzer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .result-card {
+        background: white;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    }
+    .probability-bar {
+        height: 25px;
+        background: #e2e8f0;
+        border-radius: 12px;
+        margin-bottom: 10px;
+        overflow: hidden;
+        position: relative;
+    }
+    .probability-fill {
+        height: 100%;
+        border-radius: 12px;
+        transition: width 1s ease-in-out;
+        position: relative;
+    }
+    .probability-label {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: white;
+        font-weight: 600;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+    }
+    .probability-value {
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: white;
+        font-weight: 600;
+    }
+    .diagnosis-badge { font-size: 1.1rem; padding: 0.5rem 1.5rem; }
+    .similar-ecg { border-left: 4px solid; padding-left: 15px; margin-bottom: 15px; }
+    .similar-ecg.normal    { border-left-color: #10b981; }
+    .similar-ecg.abnormal  { border-left-color: #f59e0b; }
+    .similar-ecg.mi        { border-left-color: #ef4444; }
+    .similar-ecg.post_mi   { border-left-color: #8b5cf6; }
+
+    /* ── LIME Card Styles ───────────────────────────────────────────────── */
+    .lime-card {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        border-radius: 16px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+        color: #e2e8f0;
+    }
+    .lime-card h4 { color: #38bdf8; }
+    .lime-card h5 { color: #94a3b8; font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    .lime-image-wrap {
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #0a0f1e;
+        border: 1px solid #334155;
+    }
+    .lime-image-wrap img {
+        width: 100%;
+        display: block;
+        border-radius: 12px;
+    }
+    .lime-overlay-img {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        object-fit: cover;
+        border-radius: 12px;
+        transition: opacity 0.3s ease;
+    }
+    .lime-class-btn {
+        border: 1px solid #334155;
+        background: #1e293b;
+        color: #94a3b8;
+        border-radius: 8px;
+        padding: 0.4rem 0.9rem;
+        font-size: 0.82rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-weight: 500;
+    }
+    .lime-class-btn:hover { border-color: #38bdf8; color: #38bdf8; background: #1e3a4f; }
+    .lime-class-btn.active { background: #0ea5e9; color: white; border-color: #0ea5e9; box-shadow: 0 0 10px rgba(14,165,233,0.4); }
+    .lime-weight-bar-wrap {
+        background: #1e293b;
+        border-radius: 6px;
+        height: 8px;
+        overflow: hidden;
+        flex: 1;
+    }
+    .lime-weight-bar {
+        height: 100%;
+        border-radius: 6px;
+        transition: width 0.6s ease;
+    }
+    .weight-pos { background: linear-gradient(90deg, #10b981, #34d399); }
+    .weight-neg { background: linear-gradient(90deg, #ef4444, #f87171); }
+    .lime-spinner {
+        display: none;
+        color: #38bdf8;
+        font-size: 0.9rem;
+    }
+    .lime-info-box {
+        background: #0f2036;
+        border: 1px solid #1d4ed8;
+        border-radius: 10px;
+        padding: 1rem 1.2rem;
+        font-size: 0.83rem;
+        color: #94a3b8;
+        line-height: 1.6;
+    }
+    .lime-info-box .badge-dot {
+        display: inline-block;
+        width: 10px; height: 10px;
+        border-radius: 50%;
+        margin-right: 6px;
+    }
+    .lime-no-data {
+        text-align: center;
+        padding: 2rem;
+        color: #64748b;
+    }
+    .lime-no-data i { font-size: 2.5rem; margin-bottom: 1rem; display: block; }
+    .opacity-slider {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 4px;
+        border-radius: 4px;
+        background: #334155;
+        outline: none;
+    }
+    .opacity-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 16px; height: 16px;
+        border-radius: 50%;
+        background: #38bdf8;
+        cursor: pointer;
+        box-shadow: 0 0 6px rgba(56,189,248,0.5);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Result Summary -->
+            <div class="result-card">
+                <div class="row align-items-center mb-4">
+                    <div class="col-md-8">
+                        <h1 class="mb-3">
+                            <i class="fas fa-clipboard-check me-2"></i>ECG Analysis Results
+                        </h1>
+                        <p class="text-muted mb-0">
+                            Analysis completed on {{ record.upload_date|date:"F d, Y H:i" }}
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <span class="badge diagnosis-badge bg-{% if record.predicted_category == 'normal' %}success{% elif record.predicted_category == 'abnormal' %}warning{% else %}danger{% endif %}">
+                            {{ record.get_predicted_category_display }}
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Confidence Score -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="mb-0">Confidence Score</h5>
+                        <h4 class="mb-0 text-{% if record.confidence > 90 %}success{% elif record.confidence > 70 %}warning{% else %}danger{% endif %}">
+                            {{ record.confidence|floatformat:1 }}%
+                        </h4>
+                    </div>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar progress-bar-striped" 
+                             style="width: {{ record.confidence }}%; background: linear-gradient(90deg, 
+                             {% if record.confidence > 90 %}#10b981{% elif record.confidence > 70 %}#f59e0b{% else %}#ef4444{% endif %}, 
+                             {% if record.confidence > 90 %}#34d399{% elif record.confidence > 70 %}#fbbf24{% else %}#f87171{% endif %});">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ECG Image -->
+                <div class="mb-4">
+                    <h5 class="mb-3">ECG Image</h5>
+                    <div class="text-center">
+                        <img src="{{ record.image.url }}" 
+                             alt="ECG Image" 
+                             class="img-fluid rounded shadow"
+                             style="max-height: 400px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════ LIME EXPLAINABILITY CARD ══════════════ -->
+            <div class="lime-card">
+                <h4 class="mb-1">
+                    <i class="fas fa-brain me-2"></i>AI Explainability
+                    <span class="badge ms-2" style="background:#0ea5e9;font-size:0.65rem;vertical-align:middle;">LIME XAI</span>
+                </h4>
+                <p class="mb-3" style="color:#64748b;font-size:0.88rem;">
+                    See <em>which regions</em> of the ECG drove the model's decision.
+                </p>
+
+                <!-- ── Class Toggle Buttons (Hidden while loading) ────── -->
+                <div id="lime-controls" style="display:none;">
+                    <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+                        <h5 class="mb-0 me-2">Show explanation for:</h5>
+                        <button class="lime-class-btn" data-class="abnormal"   id="btn-abnormal">Abnormal</button>
+                        <button class="lime-class-btn" data-class="mi"         id="btn-mi">Myocardial Infarction</button>
+                        <button class="lime-class-btn" data-class="normal"     id="btn-normal">Normal</button>
+                        <button class="lime-class-btn" data-class="post_mi"    id="btn-post_mi">Post MI</button>
+                        <span class="lime-spinner ms-2" id="lime-spinner">
+                            <i class="fas fa-circle-notch fa-spin"></i> Switching…
+                        </span>
+                    </div>
+
+                    <!-- ── Dual Image Viewer ──────────────────────────────── -->
+                    <div class="mb-3">
+                        <div class="lime-image-wrap" style="max-height:340px;">
+                            <img id="lime-original-img"
+                                 src="{{ record.image.url }}"
+                                 alt="Original ECG"
+                                 style="width:100%;display:block;max-height:340px;object-fit:contain;">
+                            <img id="lime-overlay-img"
+                                 src=""
+                                 alt="LIME Overlay"
+                                 class="lime-overlay-img"
+                                 style="opacity:0.75;display:none;">
+                        </div>
+                        <!-- Opacity Slider -->
+                        <div class="mt-2 px-1">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <small style="color:#64748b;"><i class="fas fa-sliders-h me-1"></i>Overlay Opacity</small>
+                                <small id="opacity-label" style="color:#38bdf8;font-weight:600;">75%</small>
+                            </div>
+                            <input type="range" class="opacity-slider" id="lime-opacity-slider"
+                                   min="0" max="100" value="75">
+                        </div>
+                    </div>
+
+                    <!-- ── Legend ─────────────────────────────────────────── -->
+                    <div class="d-flex gap-3 mb-3" style="font-size:0.82rem;">
+                        <span><span class="badge-dot" style="background:#10b981;"></span> Supports prediction</span>
+                        <span><span class="badge-dot" style="background:#ef4444;"></span> Opposes prediction</span>
+                        <span><span class="badge-dot" style="background:#334155;"></span> Neutral region</span>
+                    </div>
+
+                    <!-- ── Feature Importance Table ───────────────────────── -->
+                    <div class="mb-3">
+                        <h5 class="mb-2">Top Superpixel Weights <small style="color:#475569;font-size:0.75rem;">(higher = more influence)</small></h5>
+                        <div id="lime-feature-table">
+                            <p style="color:#475569;font-size:0.83rem;">Loading feature weights...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Async Loading State -->
+                <div id="lime-loading-state" class="text-center py-4">
+                    <div class="spinner-border text-info mb-3" role="status"></div>
+                    <h5 style="color:#e2e8f0;">Generating Explainable AI Dashboard...</h5>
+                    <p style="color:#94a3b8;font-size:0.9rem;">
+                        Running ~1000 ECG perturbations globally.<br>This usually takes 15–30 seconds.
+                    </p>
+                </div>
+
+                <!-- ── What is LIME? Info Box ─────────────────────────── -->
+                <div class="accordion" id="limeInfoAccordion">
+                    <div class="accordion-item" style="background:transparent;border:none;">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#limeInfoBody"
+                                    style="background:#0f2036;color:#94a3b8;border-radius:8px;font-size:0.83rem;padding:0.6rem 1rem;">
+                                <i class="fas fa-question-circle me-2"></i>What is LIME?
+                            </button>
+                        </h2>
+                        <div id="limeInfoBody" class="accordion-collapse collapse">
+                            <div class="lime-info-box mt-2">
+                                <strong style="color:#38bdf8;">LIME</strong> (Local Interpretable Model-agnostic Explanations)
+                                explains AI predictions by generating ~1,000 slightly modified versions of your ECG,
+                                running each through the ResNet50 model, and finding which image regions<br>
+                                caused the most change in prediction confidence.
+                                <br><br>
+                                <span class="badge-dot" style="background:#10b981;"></span>
+                                <strong style="color:#10b981;">Green regions</strong> — pushed the model
+                                <em>toward</em> the selected class.<br>
+                                <span class="badge-dot" style="background:#ef4444;"></span>
+                                <strong style="color:#ef4444;">Red regions</strong> — pushed the model
+                                <em>away</em> from the selected class.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <!-- ══════════════ END LIME CARD ══════════════ -->
+            
+            <!-- Probability Distribution -->
+            <div class="result-card">
+                <h4 class="mb-4">
+                    <i class="fas fa-chart-pie me-2"></i>Probability Distribution
+                </h4>
+                
+                {% for category, prob in probabilities.items %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="fw-medium">{{ category }}</span>
+                        <span class="fw-bold">{{ prob|floatformat:2 }}%</span>
+                    </div>
+                    <div class="probability-bar">
+                        <div class="probability-fill" 
+                             style="width: {{ prob }}%; background: linear-gradient(90deg,
+                             {% if category == 'Normal' %}#10b981{% endif %}
+                             {% if category == 'Abnormal Heartbeat' %}#f59e0b{% endif %}
+                             {% if category == 'Myocardial Infarction' %}#ef4444{% endif %}
+                             {% if category == 'Post MI History' %}#8b5cf6{% endif %},
+                             {% if category == 'Normal' %}#34d399{% endif %}
+                             {% if category == 'Abnormal Heartbeat' %}#fbbf24{% endif %}
+                             {% if category == 'Myocardial Infarction' %}#f87171{% endif %}
+                             {% if category == 'Post MI History' %}#a78bfa{% endif %});">
+                            <span class="probability-label">{{ category }}</span>
+                            <span class="probability-value">{{ prob|floatformat:1 }}%</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Notes -->
+            {% if record.notes %}
+            <div class="result-card">
+                <h4 class="mb-3">
+                    <i class="fas fa-sticky-note me-2"></i>Notes
+                </h4>
+                <div class="bg-light p-3 rounded">
+                    {{ record.notes|linebreaks }}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Actions -->
+            <div class="result-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-cogs me-2"></i>Actions
+                </h5>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'upload' %}" class="btn btn-primary">
+                        <i class="fas fa-upload me-2"></i>Upload Another ECG
+                    </a>
+                    <a href="{% url 'history' %}" class="btn btn-outline-primary">
+                        <i class="fas fa-history me-2"></i>View All Records
+                    </a>
+                    <a href="{% url 'generate_pdf_report' record.id %}" class="btn btn-outline-danger" target="_blank">
+                        <i class="fas fa-file-pdf me-2"></i>Download PDF Report
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Similar ECGs -->
+            {% if similar_records %}
+            <div class="result-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-heartbeat me-2"></i>Similar ECGs
+                </h5>
+                <div class="similar-ecgs">
+                    {% for similar in similar_records %}
+                    <div class="similar-ecg {{ similar.predicted_category }}">
+                        <div class="d-flex justify-content-between">
+                            <h6 class="mb-1">ECG #{{ similar.id }}</h6>
+                            <small class="text-muted">{{ similar.upload_date|date:"M d" }}</small>
+                        </div>
+                        <p class="mb-1 small">
+                            Confidence: {{ similar.confidence|floatformat:1 }}%
+                        </p>
+                        <a href="{% url 'ecg_result' similar.id %}" class="small">
+                            View Details <i class="fas fa-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Information -->
+            <div class="result-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-info-circle me-2"></i>About This Diagnosis
+                </h5>
+                <div class="alert alert-{% if record.predicted_category == 'normal' %}success{% elif record.predicted_category == 'abnormal' %}warning{% else %}danger{% endif %}">
+                    {% if record.predicted_category == 'normal' %}
+                    <i class="fas fa-check-circle me-2"></i>
+                    <strong>Normal ECG:</strong> No significant abnormalities detected.
+                    {% elif record.predicted_category == 'abnormal' %}
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Abnormal Heartbeat:</strong> Irregular heart rhythm detected.
+                    {% elif record.predicted_category == 'mi' %}
+                    <i class="fas fa-heart-crack me-2"></i>
+                    <strong>Myocardial Infarction:</strong> Signs of heart attack detected.
+                    {% else %}
+                    <i class="fas fa-history me-2"></i>
+                    <strong>Post MI History:</strong> Previous heart attack detected.
+                    {% endif %}
+                </div>
+                
+                <div class="alert alert-warning">
+                    <h6 class="alert-heading">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Important Notice
+                    </h6>
+                    <p class="small mb-0">
+                        This analysis is generated by an AI model and is for informational purposes only.
+                        Always consult with a healthcare professional for medical advice.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // ── Animate probability bars ──────────────────────────────────────────────
+    $('.probability-fill').each(function() {
+        const width = $(this).css('width');
+        $(this).css('width', '0');
+        setTimeout(() => { $(this).animate({width: width}, 1000); }, 500);
+    });
+
+    // ── LIME: Opacity Slider ──────────────────────────────────────────────────
+    const opacitySlider = document.getElementById('lime-opacity-slider');
+    const overlayImg    = document.getElementById('lime-overlay-img');
+    const opacityLabel  = document.getElementById('opacity-label');
+    if (opacitySlider && overlayImg) {
+        opacitySlider.addEventListener('input', function() {
+            const val = this.value / 100;
+            overlayImg.style.opacity = val;
+            opacityLabel.textContent = this.value + '%';
+        });
+    }
+
+    // ── LIME: Async Polling & Class Toggle ────────────────────────────────────
+    const limeDataUrl = "{% url 'api_lime_explanation' record.id %}";
+    let   limeCache   = null;
+
+    function renderFeatureTable(classWeights) {
+        const container = document.getElementById('lime-feature-table');
+        if (!container) return;
+        if (!classWeights || classWeights.length === 0) {
+            container.innerHTML = '<p style="color:#475569;font-size:0.83rem;">No prominent features detected for this class.</p>';
+            return;
+        }
+        const maxAbs = Math.max(...classWeights.map(([,w]) => Math.abs(w)), 1e-9);
+        let html = '<div class="d-flex flex-column gap-2">';
+        classWeights.slice(0, 8).forEach(([sp_id, weight]) => {
+            const isPos   = weight >= 0;
+            const barPct  = Math.round((Math.abs(weight) / maxAbs) * 100);
+            const barCls  = isPos ? 'weight-pos' : 'weight-neg';
+            const sign    = isPos ? '+' : '';
+            const badge   = isPos
+                ? '<span style="color:#10b981;font-size:0.7rem;">▲ supports</span>'
+                : '<span style="color:#ef4444;font-size:0.7rem;">▼ opposes</span>';
+            html += `
+            <div class="d-flex align-items-center gap-2">
+                <span style="color:#64748b;font-size:0.78rem;min-width:70px;">Region #${sp_id}</span>
+                <div class="lime-weight-bar-wrap">
+                    <div class="lime-weight-bar ${barCls}" style="width:${barPct}%;"></div>
+                </div>
+                <span style="color:#e2e8f0;font-size:0.78rem;min-width:60px;text-align:right;">${sign}${weight.toFixed(4)}</span>
+                ${badge}
+            </div>`;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    function switchLimeClass(cls) {
+        if (!limeCache || !limeCache.is_ready) return;
+
+        $('.lime-class-btn').removeClass('active');
+        $(`#btn-${cls}`).addClass('active');
+
+        // Swap image
+        const imgUrl = limeCache.lime_images[cls];
+        if (imgUrl) {
+            $('#lime-overlay-img').attr('src', imgUrl).show();
+        } else {
+            $('#lime-overlay-img').hide();
+        }
+
+        // Swap weights table (extract .weights from the inner object)
+        let weights = [];
+        if (limeCache.lime_data[cls] && limeCache.lime_data[cls].weights) {
+            weights = limeCache.lime_data[cls].weights;
+        }
+        renderFeatureTable(weights);
+    }
+
+    // Button click handler
+    $('.lime-class-btn').on('click', function() {
+        switchLimeClass($(this).data('class'));
+    });
+
+    // Polling function
+    function checkLimeStatus() {
+        $.ajax({
+            url: limeDataUrl,
+            dataType: 'json',
+            cache: false, // Prevent browser from caching is_ready: false
+            success: function(data) {
+                if (data.is_ready) {
+                    limeCache = data;
+                    $('#lime-loading-state').hide();
+                    $('#lime-controls').fadeIn();
+                    
+                    // Activate predicted class by default
+                    const predictedClass = "{{ record.predicted_category }}";
+                    switchLimeClass(predictedClass);
+                } else {
+                    // Not ready, poll again in 3s
+                    setTimeout(checkLimeStatus, 3000);
+                }
+            },
+            error: function() {
+                $('#lime-loading-state').html('<p style="color:#ef4444;">Error generating explanation.</p>');
+            }
+        });
+    }
+
+    // Start polling immediately on page load
+    checkLimeStatus();
+});
+</script>
+{% endblock %}

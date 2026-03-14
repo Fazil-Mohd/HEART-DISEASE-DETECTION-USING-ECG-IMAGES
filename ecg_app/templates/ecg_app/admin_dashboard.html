@@ -1,0 +1,502 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin Dashboard - ECG Analyzer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .system-card {
+        transition: all 0.3s ease;
+        border-left: 4px solid transparent;
+    }
+    .system-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .system-health {
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    .health-good {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    .health-warning {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    .health-danger {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    .metric-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .metric-value {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+    .metric-label {
+        color: #6b7280;
+        font-size: 0.9rem;
+    }
+    .metric-change {
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    .metric-change.positive {
+        color: #10b981;
+    }
+    .metric-change.negative {
+        color: #ef4444;
+    }
+    .user-activity-chart {
+        height: 250px;
+    }
+    .table-actions .btn {
+        padding: 2px 8px;
+        font-size: 0.85rem;
+    }
+    .log-entry {
+        padding: 10px;
+        border-left: 3px solid;
+        margin-bottom: 8px;
+        background: #f9fafb;
+        border-radius: 4px;
+    }
+    .log-info {
+        border-left-color: #3b82f6;
+    }
+    .log-warning {
+        border-left-color: #f59e0b;
+    }
+    .log-error {
+        border-left-color: #ef4444;
+    }
+    .log-success {
+        border-left-color: #10b981;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="mb-1">
+                        <i class="fas fa-cogs me-2"></i>Admin Dashboard
+                    </h1>
+                    <p class="text-muted mb-0">User management and system monitoring</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Overview -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-white border-bottom-0">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>System Overview
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- System Health -->
+                        <div class="col-md-6 mb-4">
+                            <div class="metric-card">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <div>
+                                        <div class="metric-label">System Health</div>
+                                        <div class="metric-value">
+                                            {% if total_ecgs > 0 and total_users > 0 %}
+                                            <span class="text-success">Good</span>
+                                            {% elif total_ecgs == 0 %}
+                                            <span class="text-warning">Setup Required</span>
+                                            {% else %}
+                                            <span class="text-danger">Needs Attention</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="system-health {% if total_ecgs > 0 and total_users > 0 %}health-good{% elif total_ecgs == 0 %}health-warning{% else %}health-danger{% endif %}">
+                                        {% if total_ecgs > 0 and total_users > 0 %}
+                                        100%
+                                        {% elif total_ecgs == 0 %}
+                                        50%
+                                        {% else %}
+                                        25%
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="small text-muted">
+                                    All systems operational
+                                    {% if total_ecgs == 0 %}
+                                    <br><span class="text-warning">No ECG data available</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Active Users -->
+                        <div class="col-md-6 mb-4">
+                            <div class="metric-card">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <div>
+                                        <div class="metric-label">Active Users (Today)</div>
+                                        <div class="metric-value">{{ active_users_today }}</div>
+                                    </div>
+                                    <div class="system-health health-good">
+                                        {{ active_percentage }}%
+                                    </div>
+                                </div>
+                                <div class="small text-muted">
+                                    {{ active_users_today }} out of {{ total_users }} users active today
+                                    <div class="metric-change positive mt-1">
+                                        <i class="fas fa-arrow-up me-1"></i>{{ growth_rate }}% from yesterday
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Key Metrics -->
+                        <div class="col-md-4 mb-3">
+                            <div class="card system-card">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-users display-6 text-primary mb-3"></i>
+                                    <h3 class="mb-1">{{ total_users }}</h3>
+                                    <div class="metric-label">Total Users</div>
+                                    <div class="metric-change positive mt-2">
+                                        <i class="fas fa-arrow-up me-1"></i>{{ user_growth }}% this month
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <div class="card system-card">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-file-medical-alt display-6 text-success mb-3"></i>
+                                    <h3 class="mb-1">{{ total_ecgs }}</h3>
+                                    <div class="metric-label">Total ECGs</div>
+                                    <div class="metric-change positive mt-2">
+                                        <i class="fas fa-arrow-up me-1"></i>{{ ecg_growth }}% this week
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <div class="card system-card">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-chart-bar display-6 text-info mb-3"></i>
+                                    <h3 class="mb-1">{% widthratio total_ecgs total_users 1 %}</h3>
+                                    <div class="metric-label">Avg. ECGs per User</div>
+                                    <div class="metric-change positive mt-2">
+                                        <i class="fas fa-arrow-up me-1"></i>{{ avg_growth }}% this month
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header bg-white border-bottom-0">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt me-2"></i>User Management
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'admin:auth_user_add' %}" class="btn btn-primary">
+                            <i class="fas fa-user-plus me-2"></i>Add New User
+                        </a>
+                        <a href="{% url 'admin:auth_user_changelist' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-users-cog me-2"></i>Manage Users
+                        </a>
+                        <a href="{% url 'admin:ecg_app_ecgrecord_changelist' %}" class="btn btn-outline-success">
+                            <i class="fas fa-file-medical-alt me-2"></i>View All ECGs
+                        </a>
+                        <button class="btn btn-outline-warning" id="generateReportBtn">
+                            <i class="fas fa-file-pdf me-2"></i>Generate Report
+                        </button>
+                        <a href="{% url 'export_history_csv_view' %}" class="btn btn-outline-info">
+                            <i class="fas fa-download me-2"></i>Export Data
+                        </a>
+                    </div>
+                    
+                    <!-- System Info -->
+                    <div class="mt-4 p-3 bg-light rounded">
+                        <h6 class="mb-3">
+                            <i class="fas fa-info-circle me-2"></i>System Information
+                        </h6>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="small">Server Time:</span>
+                            <span class="small text-muted">{% now "H:i:s" %}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="small">ECGs Today:</span>
+                            <span class="small text-muted">{{ ecgs_today }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="small">New Users Today:</span>
+                            <span class="small text-muted">{{ new_users_today }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent User Activity -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-white border-bottom-0 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history me-2"></i>Recent User Activity
+                    </h5>
+                    <a href="{% url 'admin:auth_user_changelist' %}" class="btn btn-sm btn-outline-primary">View All Users</a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Last Login</th>
+                                    <th>Total ECGs</th>
+                                    <th>Last Activity</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in recent_users %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2">
+                                                {{ user.first_name|first|default:user.username|first|upper }}
+                                            </div>
+                                            <div>
+                                                <div class="fw-medium">{{ user.first_name|default:user.username }}</div>
+                                                <small class="text-muted">{{ user.email }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{{ user.last_login|date:"M d, Y H:i"|default:"Never" }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ user.ecg_count }}</span>
+                                    </td>
+                                    <td>
+                                        {% if user.last_activity %}
+                                        {{ user.last_activity|timesince }} ago
+                                        {% else %}
+                                        No activity
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'admin:auth_user_change' user.id %}" class="btn btn-outline-primary" title="Edit">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{% url 'admin:ecg_app_ecgrecord_changelist' %}?user__id__exact={{ user.id }}" class="btn btn-outline-info" title="View ECGs">
+                                                <i class="fas fa-file-medical-alt"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4">
+                                        <i class="fas fa-users display-4 text-muted mb-3"></i>
+                                        <p class="text-muted">No user activity found</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Logs & Recent ECGs -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-white border-bottom-0">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-medical-alt me-2"></i>Recent ECG Analyses
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>User</th>
+                                    <th>Date</th>
+                                    <th>Result</th>
+                                    <th>Confidence</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ecg in recent_ecgs %}
+                                <tr>
+                                    <td class="fw-bold">#{{ ecg.id }}</td>
+                                    <td>{{ ecg.user.username }}</td>
+                                    <td>{{ ecg.upload_date|date:"M d, Y H:i" }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if ecg.predicted_category == 'normal' %}success{% else %}warning{% endif %}">
+                                            {{ ecg.get_predicted_category_display|default:"Pending" }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if ecg.confidence %}
+                                        <span class="fw-bold">{{ ecg.confidence|floatformat:1 }}%</span>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ecg.status == 'completed' %}
+                                        <span class="badge bg-success">Completed</span>
+                                        {% elif ecg.status == 'processing' %}
+                                        <span class="badge bg-warning">Processing</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">Failed</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'ecg_result' ecg.id %}" class="btn btn-outline-primary" title="View">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'admin:ecg_app_ecgrecord_change' ecg.id %}" class="btn btn-outline-secondary" title="Edit">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-4">
+                                        <i class="fas fa-file-medical-alt display-4 text-muted mb-3"></i>
+                                        <p class="text-muted">No ECG analyses found</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header bg-white border-bottom-0">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clipboard-list me-2"></i>System Logs
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="log-entries">
+                        <div class="log-entry log-success">
+                            <div class="d-flex justify-content-between">
+                                <small class="fw-medium">New user registered</small>
+                                <small class="text-muted">{% now "H:i" %}</small>
+                            </div>
+                            <small class="text-muted">Total users: {{ total_users }}</small>
+                        </div>
+                        <div class="log-entry log-info">
+                            <div class="d-flex justify-content-between">
+                                <small class="fw-medium">ECG analysis completed</small>
+                                <small class="text-muted">{% now "H:i" %}</small>
+                            </div>
+                            <small class="text-muted">Confidence: 85.2%</small>
+                        </div>
+                        <div class="log-entry log-warning">
+                            <div class="d-flex justify-content-between">
+                                <small class="fw-medium">Failed ECG upload</small>
+                                <small class="text-muted">{% now "H:i" %}</small>
+                            </div>
+                            <small class="text-muted">Invalid file format</small>
+                        </div>
+                        <div class="log-entry log-error">
+                            <div class="d-flex justify-content-between">
+                                <small class="fw-medium">User login failed</small>
+                                <small class="text-muted">{% now "H:i" %}</small>
+                            </div>
+                            <small class="text-muted">Invalid credentials</small>
+                        </div>
+                        <div class="log-entry log-info">
+                            <div class="d-flex justify-content-between">
+                                <small class="fw-medium">System backup created</small>
+                                <small class="text-muted">{% now "H:i" %}</small>
+                            </div>
+                            <small class="text-muted">Backup size: 156 MB</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+</div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Generate Report Button
+    $('#generateReportBtn').click(function() {
+        const btn = $(this);
+        const originalText = btn.html();
+        
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Generating...');
+        
+        // Simulate report generation
+        setTimeout(() => {
+            alert('Report generated successfully! It would be downloaded automatically.');
+            btn.prop('disabled', false).html(originalText);
+            
+            // In a real implementation, this would trigger a download
+            // window.location.href = '/admin/generate-report/';
+        }, 1500);
+    });
+    
+    // Auto-refresh dashboard every 60 seconds
+    setInterval(() => {
+        // Only auto-refresh if no modal is open and user is not typing
+        if ($('.modal').length === 0 && !$('input:focus, textarea:focus').length) {
+            location.reload();
+        }
+    }, 60000);
+});
+</script>
+{% endblock %}

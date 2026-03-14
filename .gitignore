@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.keras
+*.h5
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# VS Code
+.vscode/
+
+# Django
+db.sqlite3
+media/
+*.log
+
+# Large Models
+resnet_models/*.keras
+resnet_models/*.h5

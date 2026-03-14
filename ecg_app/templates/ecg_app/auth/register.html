@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+
+{% block title %}Register - ECG Analyzer{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card p-4">
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-user-plus display-4 text-primary mb-3"></i>
+                        <h2>Create Account</h2>
+                        <p class="text-muted">Join ECG Analyzer for advanced heart health monitoring</p>
+                    </div>
+                    
+                    <form method="POST" action="{% url 'register' %}">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="id_first_name" class="form-label">First Name</label>
+                                {{ form.first_name }}
+                                {% if form.first_name.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.first_name.errors %}
+                                    {{ error }}
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="id_last_name" class="form-label">Last Name</label>
+                                {{ form.last_name }}
+                                {% if form.last_name.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.last_name.errors %}
+                                    {{ error }}
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="id_username" class="form-label">Username</label>
+                            {{ form.username }}
+                            <div class="form-text">Choose a unique username.</div>
+                            {% if form.username.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.username.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="id_email" class="form-label">Email Address</label>
+                            {{ form.email }}
+                            <div class="form-text">We'll never share your email.</div>
+                            {% if form.email.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.email.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="id_password1" class="form-label">Password</label>
+                            {{ form.password1 }}
+                            <div class="form-text">
+                                <ul class="mb-0 ps-3">
+                                    <li>At least 8 characters</li>
+                                    <li>Include letters and numbers</li>
+                                </ul>
+                            </div>
+                            {% if form.password1.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.password1.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="id_password2" class="form-label">Confirm Password</label>
+                            {{ form.password2 }}
+                            {% if form.password2.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.password2.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="d-grid gap-2 mb-3">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-user-plus me-2"></i> Create Account
+                            </button>
+                        </div>
+                        
+                        <div class="text-center">
+                            <p class="mb-0">Already have an account? 
+                                <a href="{% url 'login' %}" class="text-decoration-none fw-bold">
+                                    Sign In
+                                </a>
+                            </p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Why Join ECG Analyzer?</h5>
+                        <div class="row mt-3">
+                            <div class="col-md-4 mb-3">
+                                <i class="fas fa-brain text-primary fa-2x mb-2"></i>
+                                <h6>AI Analysis</h6>
+                                <p class="small">Advanced deep learning algorithms</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <i class="fas fa-history text-primary fa-2x mb-2"></i>
+                                <h6>Track History</h6>
+                                <p class="small">Monitor your ECG records over time</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <i class="fas fa-shield-alt text-primary fa-2x mb-2"></i>
+                                <h6>Secure</h6>
+                                <p class="small">HIPAA-compliant data protection</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

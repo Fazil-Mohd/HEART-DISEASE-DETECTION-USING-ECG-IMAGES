@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block title %}Login - ECG Analyzer{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card p-4">
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-sign-in-alt display-4 text-primary mb-3"></i>
+                        <h2>Welcome Back</h2>
+                        <p class="text-muted">Sign in to your ECG Analyzer account</p>
+                    </div>
+                    
+                    <form method="POST" action="{% url 'login' %}">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="id_username" class="form-label">Username</label>
+                            {{ form.username }}
+                            {% if form.username.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.username.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="id_password" class="form-label">Password</label>
+                            {{ form.password }}
+                            {% if form.password.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.password.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="rememberMe" name="remember_me">
+                            <label class="form-check-label" for="rememberMe">Remember me</label>
+                        </div>
+                        
+                        <div class="d-grid gap-2 mb-3">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-sign-in-alt me-2"></i> Sign In
+                            </button>
+                        </div>
+                        
+                        <div class="text-center mb-3">
+                            <a href="{% url 'password_reset' %}" class="text-decoration-none">
+                                <i class="fas fa-key me-1"></i> Forgot Password?
+                            </a>
+                        </div>
+                        
+                        <div class="text-center">
+                            <p class="mb-0">Don't have an account? 
+                                <a href="{% url 'register' %}" class="text-decoration-none fw-bold">
+                                    Create Account
+                                </a>
+                            </p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="text-center mt-4">
+                <p class="text-muted">
+                    <i class="fas fa-shield-alt me-1"></i>
+                    Your data is securely encrypted and protected.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

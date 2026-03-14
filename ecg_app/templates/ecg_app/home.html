@@ -1,0 +1,284 @@
+{% extends 'base.html' %}
+
+{% block title %}ECG Heart Disease Detection{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section py-5">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <h1 class="display-4 fw-bold mb-4">
+                    AI-Powered ECG Analysis for Early Heart Disease Detection
+                </h1>
+                <p class="lead mb-4">
+                    Upload your ECG images and get instant AI-powered analysis for 
+                    early detection of heart conditions with high accuracy.
+                </p>
+                <div class="d-flex flex-wrap gap-3 mb-5">
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'upload' %}" class="btn btn-primary btn-lg px-4">
+                        <i class="fas fa-upload me-2"></i>Upload ECG
+                    </a>
+                    <a href="{% url 'dashboard' %}" class="btn btn-outline-primary btn-lg px-4">
+                        <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                    </a>
+                    {% else %}
+                    <a href="{% url 'register' %}" class="btn btn-primary btn-lg px-4">
+                        <i class="fas fa-user-plus me-2"></i>Get Started Free
+                    </a>
+                    <a href="{% url 'login' %}" class="btn btn-outline-primary btn-lg px-4">
+                        <i class="fas fa-sign-in-alt me-2"></i>Sign In
+                    </a>
+                    {% endif %}
+                </div>
+                <div class="d-flex align-items-center">
+                    <div class="me-4">
+                        <h3 class="mb-0">95%</h3>
+                        <small class="text-muted">Accuracy</small>
+                    </div>
+                    <div class="me-4">
+                        <h3 class="mb-0">&lt;5s</h3>
+                        <small class="text-muted">Analysis Time</small>
+                    </div>
+                    <div>
+                        <h3 class="mb-0">4+</h3>
+                        <small class="text-muted">Conditions Detected</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-lg">
+                    <div class="card-body p-4">
+                        <img src="https://images.unsplash.com/photo-1559757148-5c350d0d3c56?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" 
+                             alt="ECG Analysis" 
+                             class="img-fluid rounded">
+                        <div class="mt-4">
+                            <h5>How It Works</h5>
+                            <div class="row mt-3">
+                                <div class="col-4 text-center">
+                                    <div class="bg-primary bg-opacity-10 rounded-circle p-3 d-inline-block mb-2">
+                                        <i class="fas fa-upload text-primary fa-lg"></i>
+                                    </div>
+                                    <p class="small mb-0">Upload ECG</p>
+                                </div>
+                                <div class="col-4 text-center">
+                                    <div class="bg-primary bg-opacity-10 rounded-circle p-3 d-inline-block mb-2">
+                                        <i class="fas fa-brain text-primary fa-lg"></i>
+                                    </div>
+                                    <p class="small mb-0">AI Analysis</p>
+                                </div>
+                                <div class="col-4 text-center">
+                                    <div class="bg-primary bg-opacity-10 rounded-circle p-3 d-inline-block mb-2">
+                                        <i class="fas fa-chart-line text-primary fa-lg"></i>
+                                    </div>
+                                    <p class="small mb-0">Get Results</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row mb-5">
+            <div class="col-12 text-center">
+                <h2 class="mb-3">Why Choose ECG Analyzer?</h2>
+                <p class="lead text-muted">Advanced features for comprehensive heart health monitoring</p>
+            </div>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body p-4">
+                        <div class="display-1 text-primary mb-3">
+                            <i class="fas fa-brain"></i>
+                        </div>
+                        <h4 class="card-title mb-3">AI-Powered Analysis</h4>
+                        <p class="card-text">
+                            Advanced deep learning algorithms analyze ECG patterns with 95% accuracy,
+                            detecting subtle abnormalities that might be missed by manual inspection.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body p-4">
+                        <div class="display-1 text-primary mb-3">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <h4 class="card-title mb-3">Instant Results</h4>
+                        <p class="card-text">
+                            Get comprehensive analysis results in under 5 seconds.
+                            No waiting for appointments or lab results - immediate insights.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body p-4">
+                        <div class="display-1 text-primary mb-3">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <h4 class="card-title mb-3">Secure & Private</h4>
+                        <p class="card-text">
+                            HIPAA-compliant data protection. Your ECG images and analysis
+                            results are encrypted and stored securely with strict privacy controls.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Conditions Detected -->
+<section class="py-5">
+    <div class="container">
+        <div class="row mb-5">
+            <div class="col-12 text-center">
+                <h2 class="mb-3">Conditions We Detect</h2>
+                <p class="lead text-muted">Comprehensive analysis of major heart conditions</p>
+            </div>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-3">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body p-4 text-center">
+                        <div class="mb-3">
+                            <i class="fas fa-heartbeat text-success fa-3x"></i>
+                        </div>
+                        <h5>Normal ECG</h5>
+                        <p class="small text-muted">
+                            Regular heart rhythm with no significant abnormalities detected.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body p-4 text-center">
+                        <div class="mb-3">
+                            <i class="fas fa-exclamation-triangle text-warning fa-3x"></i>
+                        </div>
+                        <h5>Abnormal Heartbeat</h5>
+                        <p class="small text-muted">
+                            Irregular heart rhythm including arrhythmias and palpitations.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body p-4 text-center">
+                        <div class="mb-3">
+                            <i class="fas fa-heart-crack text-danger fa-3x"></i>
+                        </div>
+                        <h5>Myocardial Infarction</h5>
+                        <p class="small text-muted">
+                            Detection of heart attack through ST-segment elevation analysis.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body p-4 text-center">
+                        <div class="mb-3">
+                            <i class="fas fa-history text-info fa-3x"></i>
+                        </div>
+                        <h5>Post MI History</h5>
+                        <p class="small text-muted">
+                            Identification of previous heart attack patterns and damage.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Testimonials -->
+{% if not user.is_authenticated %}
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row mb-5">
+            <div class="col-12 text-center">
+                <h2 class="mb-3">Join Thousands of Users</h2>
+                <p class="lead text-muted">Start monitoring your heart health today</p>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-8 mx-auto">
+                <div class="card border-0 shadow">
+                    <div class="card-body p-5">
+                        <div class="text-center mb-4">
+                            <h3>Ready to Get Started?</h3>
+                            <p class="text-muted">Create your free account in seconds</p>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="card bg-primary text-white">
+                                    <div class="card-body text-center p-4">
+                                        <i class="fas fa-user-plus display-1 mb-3"></i>
+                                        <h4>Free Account</h4>
+                                        <p class="mb-3">Basic ECG analysis and history tracking</p>
+                                        <a href="{% url 'register' %}" class="btn btn-light btn-lg w-100">
+                                            Sign Up Free
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card border">
+                                    <div class="card-body text-center p-4">
+                                        <i class="fas fa-crown display-1 text-warning mb-3"></i>
+                                        <h4>Premium Features</h4>
+                                        <p class="mb-3">Advanced analysis and doctor consultation</p>
+                                        <a href="#" class="btn btn-outline-primary btn-lg w-100">
+                                            Coming Soon
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<!-- CTA Section -->
+<section class="py-5 bg-primary text-white">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h2 class="mb-3">Start Monitoring Your Heart Health Today</h2>
+                <p class="mb-0">
+                    Early detection saves lives. Get instant AI-powered analysis of your ECG images.
+                </p>
+            </div>
+            <div class="col-md-4 text-md-end">
+                {% if user.is_authenticated %}
+                <a href="{% url 'upload' %}" class="btn btn-light btn-lg px-4">
+                    <i class="fas fa-upload me-2"></i>Upload ECG Now
+                </a>
+                {% else %}
+                <a href="{% url 'register' %}" class="btn btn-light btn-lg px-4">
+                    <i class="fas fa-user-plus me-2"></i>Get Started Free
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

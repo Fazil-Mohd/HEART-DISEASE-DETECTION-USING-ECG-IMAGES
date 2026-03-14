@@ -1,0 +1,517 @@
+{% extends 'base.html' %}
+
+{% block title %}Upload ECG - ECG Analyzer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .upload-area {
+        border: 3px dashed #667eea;
+        border-radius: 15px;
+        padding: 3rem;
+        text-align: center;
+        background: #f8fafc;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin-bottom: 2rem;
+    }
+    .upload-area:hover {
+        background: #e2e8f0;
+        border-color: #764ba2;
+    }
+    .upload-area.dragover {
+        background: #667eea20;
+        border-color: #764ba2;
+    }
+    .upload-preview {
+        max-width: 300px;
+        margin: 0 auto;
+        display: none;
+    }
+    .step-indicator {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 2rem;
+        position: relative;
+    }
+    .step-indicator::before {
+        content: '';
+        position: absolute;
+        top: 20px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: #e2e8f0;
+        z-index: 1;
+    }
+    .step {
+        text-align: center;
+        position: relative;
+        z-index: 2;
+        flex: 1;
+    }
+    .step-number {
+        width: 40px;
+        height: 40px;
+        background: #e2e8f0;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 10px;
+        font-weight: bold;
+        color: #64748b;
+    }
+    .step.active .step-number {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+    }
+    .step.completed .step-number {
+        background: #10b981;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Step Indicator -->
+            <div class="step-indicator">
+                <div class="step active" id="step1">
+                    <div class="step-number">1</div>
+                    <span class="small">Upload</span>
+                </div>
+                <div class="step" id="step2">
+                    <div class="step-number">2</div>
+                    <span class="small">Preview</span>
+                </div>
+                <div class="step" id="step3">
+                    <div class="step-number">3</div>
+                    <span class="small">Analyze</span>
+                </div>
+                <div class="step" id="step4">
+                    <div class="step-number">4</div>
+                    <span class="small">Results</span>
+                </div>
+            </div>
+            
+            <!-- Upload Form -->
+            <div class="card">
+                <div class="card-header bg-white border-0">
+                    <h2 class="mb-0">
+                        <i class="fas fa-upload me-2"></i>Upload ECG Image
+                    </h2>
+                    <p class="text-muted mb-0">Upload your ECG image for AI analysis</p>
+                </div>
+                
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data" id="ecgUploadForm">
+                        {% csrf_token %}
+                        
+                        <!-- Step 1: Upload -->
+                        <div class="step-content" id="step1-content">
+                            <div class="upload-area" id="dropArea">
+                                <i class="fas fa-cloud-upload-alt display-4 text-primary mb-3"></i>
+                                <h4>Drag & Drop ECG Image</h4>
+                                <p class="text-muted mb-3">or click to browse</p>
+                                
+                                <div class="mb-3">
+                                    {{ form.image }}
+                                </div>
+                                
+                                <p class="small text-muted">
+                                    Supported formats: JPG, PNG, JPEG<br>
+                                    Maximum size: 10MB
+                                </p>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-outline-primary" id="nextStep1">
+                                    Next <i class="fas fa-arrow-right ms-2"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 2: Preview & Notes -->
+                        <div class="step-content" id="step2-content" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-6 mb-4">
+                                    <h5>Image Preview</h5>
+                                    <div class="upload-preview" id="imagePreview">
+                                        <img id="previewImage" class="img-fluid rounded" alt="ECG Preview">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5>Additional Information</h5>
+                                    <div class="mb-3">
+                                        <label class="form-label">Notes (Optional)</label>
+                                        {{ form.notes }}
+                                    </div>
+                                    
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-lightbulb me-2"></i>
+                                        Add any relevant notes about this ECG for better record keeping.
+                                    </div>
+                                    
+                                    <div class="d-flex justify-content-between mt-4">
+                                        <button type="button" class="btn btn-outline-secondary" id="prevStep2">
+                                            <i class="fas fa-arrow-left me-2"></i> Back
+                                        </button>
+                                        <button type="button" class="btn btn-primary" id="nextStep2">
+                                            Analyze <i class="fas fa-play ms-2"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 3: Processing -->
+                        <div class="step-content" id="step3-content" style="display: none;">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <h4>Analyzing ECG Image</h4>
+                                <p class="text-muted">Our AI model is processing your ECG...</p>
+                                
+                                <div class="progress mb-3" style="height: 10px;">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                         id="processingProgress" style="width: 0%"></div>
+                                </div>
+                                
+                                <div id="processingStatus">Initializing analysis...</div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Tips & Guidelines -->
+            <div class="card mt-4">
+                <div class="card-header bg-white border-0">
+                    <h5 class="mb-0">
+                        <i class="fas fa-lightbulb me-2"></i>Tips for Best Results
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="d-flex">
+                                <div class="me-3">
+                                    <i class="fas fa-check-circle text-success"></i>
+                                </div>
+                                <div>
+                                    <h6>Clear Image</h6>
+                                    <p class="small mb-0">Ensure the ECG image is clear and well-lit.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="d-flex">
+                                <div class="me-3">
+                                    <i class="fas fa-check-circle text-success"></i>
+                                </div>
+                                <div>
+                                    <h6>Complete Waveform</h6>
+                                    <p class="small mb-0">Capture the entire ECG waveform.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="d-flex">
+                                <div class="me-3">
+                                    <i class="fas fa-check-circle text-success"></i>
+                                </div>
+                                <div>
+                                    <h6>No Glare</h6>
+                                    <p class="small mb-0">Avoid glare and reflections on the image.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="d-flex">
+                                <div class="me-3">
+                                    <i class="fas fa-check-circle text-success"></i>
+                                </div>
+                                <div>
+                                    <h6>Grid Lines</h6>
+                                    <p class="small mb-0">Make sure grid lines are visible.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Uploads -->
+            <div class="card mt-4">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history me-2"></i>Recent Uploads
+                    </h5>
+                    <a href="{% url 'history' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body">
+                    {% if recent_ecgs %}
+                    <div class="list-group list-group-flush">
+                        {% for ecg in recent_ecgs %}
+                        <a href="{% url 'ecg_result' ecg.id %}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <div>
+                                    <h6 class="mb-1">ECG #{{ ecg.id }}</h6>
+                                    <p class="mb-0 small text-muted">
+                                        {{ ecg.upload_date|date:"M d, Y H:i" }}
+                                    </p>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-{% if ecg.predicted_category == 'normal' %}success{% else %}warning{% endif %}">
+                                        {{ ecg.get_predicted_category_display }}
+                                    </span>
+                                    <div class="mt-1">
+                                        <small class="text-muted">{{ ecg.confidence|floatformat:1 }}%</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-file-medical-alt display-1 text-muted mb-3"></i>
+                        <p class="text-muted">No ECG uploads yet</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded - starting script');
+    
+    let currentStep = 1;
+    
+    // Get all required elements
+    const dropArea = document.getElementById('dropArea');
+    const fileInput = document.getElementById('id_image');
+    const previewImage = document.getElementById('previewImage');
+    const imagePreview = document.getElementById('imagePreview');
+    
+    // Get navigation buttons
+    const nextStep1Btn = document.getElementById('nextStep1');
+    const prevStep2Btn = document.getElementById('prevStep2');
+    const nextStep2Btn = document.getElementById('nextStep2');
+    
+    // Debug: Log all elements to console
+    console.log('Elements found:');
+    console.log('nextStep1Btn:', nextStep1Btn);
+    console.log('prevStep2Btn:', prevStep2Btn);
+    console.log('nextStep2Btn:', nextStep2Btn);
+    console.log('fileInput:', fileInput);
+    
+    // Add event listeners if buttons exist
+    if (nextStep1Btn) {
+        nextStep1Btn.addEventListener('click', function(e) {
+            console.log('Next Step 1 clicked');
+            e.preventDefault();
+            navigateToStep(2);
+        });
+    } else {
+        console.error('nextStep1 button not found!');
+    }
+    
+    if (prevStep2Btn) {
+        prevStep2Btn.addEventListener('click', function(e) {
+            console.log('Previous Step 2 clicked');
+            e.preventDefault();
+            navigateToStep(1);
+        });
+    }
+    
+    if (nextStep2Btn) {
+        nextStep2Btn.addEventListener('click', function(e) {
+            console.log('Next Step 2 clicked');
+            e.preventDefault();
+            processUpload();
+        });
+    }
+    
+    // File upload handling
+    if (dropArea && fileInput) {
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        // Highlight drop area when item is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+        
+        // Handle dropped files
+        dropArea.addEventListener('drop', handleDrop, false);
+        
+        // Handle file input change
+        fileInput.addEventListener('change', handleFileSelect, false);
+        
+        // Click on drop area to trigger file input
+        dropArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+    }
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    function highlight() {
+        dropArea.classList.add('dragover');
+    }
+    
+    function unhighlight() {
+        dropArea.classList.remove('dragover');
+    }
+    
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        fileInput.files = files;
+        handleFileSelect({ target: { files: files } });
+    }
+    
+    function handleFileSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        console.log('File selected:', file.name);
+        
+        if (!file.type.match('image.*')) {
+            alert('Please select an image file.');
+            return;
+        }
+        
+        if (file.size > 10 * 1024 * 1024) {
+            alert('File size must be less than 10MB.');
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewImage.src = e.target.result;
+            imagePreview.style.display = 'block';
+            console.log('Image preview loaded');
+        };
+        reader.readAsDataURL(file);
+        
+        // Auto-advance to next step after successful file selection
+        setTimeout(() => {
+            navigateToStep(2);
+        }, 500);
+    }
+    
+    function navigateToStep(step) {
+        console.log('Navigating to step', step);
+        
+        // Hide all steps
+        document.querySelectorAll('.step-content').forEach(el => {
+            el.style.display = 'none';
+        });
+        
+        // Update step indicators
+        document.querySelectorAll('.step').forEach(el => {
+            el.classList.remove('active', 'completed');
+        });
+        
+        // Mark previous steps as completed
+        for (let i = 1; i < step; i++) {
+            const stepEl = document.getElementById('step' + i);
+            if (stepEl) {
+                stepEl.classList.add('completed');
+            }
+        }
+        
+        // Mark current step as active
+        const currentStepEl = document.getElementById('step' + step);
+        if (currentStepEl) {
+            currentStepEl.classList.add('active');
+        }
+        
+        // Show current step content
+        const stepContentEl = document.getElementById('step' + step + '-content');
+        if (stepContentEl) {
+            stepContentEl.style.display = 'block';
+        }
+        
+        currentStep = step;
+        console.log('Now on step:', currentStep);
+    }
+    
+    function processUpload() {
+        console.log('Processing upload...');
+        
+        // Check if file is selected
+        if (!fileInput.files || fileInput.files.length === 0) {
+            alert('Please select an ECG image first.');
+            navigateToStep(1);
+            return;
+        }
+        
+        navigateToStep(3);
+        
+        // Simulate processing progress
+        let progress = 0;
+        const progressBar = document.getElementById('processingProgress');
+        const statusText = document.getElementById('processingStatus');
+        
+        const interval = setInterval(() => {
+            progress += Math.random() * 20;
+            if (progress > 100) progress = 100;
+            progressBar.style.width = progress + '%';
+            
+            if (progress < 30) {
+                statusText.textContent = 'Loading model...';
+            } else if (progress < 60) {
+                statusText.textContent = 'Processing ECG image...';
+            } else if (progress < 90) {
+                statusText.textContent = 'Analyzing patterns...';
+            } else {
+                statusText.textContent = 'Finalizing results...';
+            }
+            
+            if (progress >= 100) {
+                clearInterval(interval);
+                setTimeout(() => {
+                    console.log('Submitting form...');
+                    // Submit the form
+                    document.getElementById('ecgUploadForm').submit();
+                }, 1000);
+            }
+        }, 300);
+    }
+    
+    // Initialize - show step 1
+    console.log('Initializing...');
+    navigateToStep(1);
+    
+    // Add a simple test button to check if JS is working
+    const testBtn = document.createElement('button');
+    testBtn.textContent = 'Test JavaScript';
+    testBtn.className = 'btn btn-sm btn-warning position-fixed';
+    testBtn.style.bottom = '10px';
+    testBtn.style.right = '10px';
+    testBtn.style.zIndex = '9999';
+    testBtn.onclick = function() {
+        alert('JavaScript is working!');
+    };
+    document.body.appendChild(testBtn);
+});
+</script>
+{% endblock %}

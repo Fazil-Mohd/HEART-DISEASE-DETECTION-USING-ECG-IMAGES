@@ -1,0 +1,625 @@
+{% extends 'base.html' %}
+
+{% block title %}ECG History - ECG Analyzer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .record-card {
+        transition: all 0.3s ease;
+        border-left: 4px solid transparent;
+    }
+    .record-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .record-normal {
+        border-left-color: #10b981;
+    }
+    .record-abnormal {
+        border-left-color: #f59e0b;
+    }
+    .record-mi {
+        border-left-color: #ef4444;
+    }
+    .record-post_mi {
+        border-left-color: #8b5cf6;
+    }
+    .probability-bar {
+        height: 8px;
+        border-radius: 4px;
+        overflow: hidden;
+        background: #e5e7eb;
+    }
+    .probability-fill {
+        height: 100%;
+        transition: width 0.5s ease;
+    }
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    .status-processing {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+    .status-completed {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    .status-failed {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    .filter-tabs .nav-link {
+        border: none;
+        padding: 10px 20px;
+        font-weight: 500;
+    }
+    .filter-tabs .nav-link.active {
+        border-bottom: 3px solid var(--primary-color);
+        color: var(--primary-color);
+    }
+    .empty-state {
+        padding: 60px 20px;
+        text-align: center;
+        color: #6b7280;
+    }
+    .chart-container {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .date-badge {
+        background: #f3f4f6;
+        color: #4b5563;
+        padding: 4px 12px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-lg-3 col-xl-2 mb-4">
+            <!-- Sidebar Filters -->
+            <div class="card">
+                <div class="card-header bg-white border-bottom">
+                    <h5 class="mb-0">
+                        <i class="fas fa-filter me-2"></i>Filters
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Status Filter -->
+                    <div class="mb-4">
+                        <h6 class="mb-3">Status</h6>
+                        <div class="list-group list-group-flush">
+                            <a href="?status=all" 
+                               class="list-group-item list-group-item-action border-0 py-2 {% if request.GET.status == 'all' or not request.GET.status %}active{% endif %}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>All Records</span>
+                                    <span class="badge bg-secondary rounded-pill">{{ total_records }}</span>
+                                </div>
+                            </a>
+                            <a href="?status=completed" 
+                               class="list-group-item list-group-item-action border-0 py-2 {% if request.GET.status == 'completed' %}active{% endif %}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>Completed</span>
+                                    <span class="badge bg-success rounded-pill">{{ completed_count|default:0 }}</span>
+                                </div>
+                            </a>
+                            <a href="?status=processing" 
+                               class="list-group-item list-group-item-action border-0 py-2 {% if request.GET.status == 'processing' %}active{% endif %}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>Processing</span>
+                                    <span class="badge bg-primary rounded-pill">{{ processing_count|default:0 }}</span>
+                                </div>
+                            </a>
+                            <a href="?status=failed" 
+                               class="list-group-item list-group-item-action border-0 py-2 {% if request.GET.status == 'failed' %}active{% endif %}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>Failed</span>
+                                    <span class="badge bg-danger rounded-pill">{{ failed_count|default:0 }}</span>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Category Filter -->
+                    <div class="mb-4">
+                        <h6 class="mb-3">Category</h6>
+                        <div class="list-group list-group-flush">
+                            <a href="?category=all" 
+                               class="list-group-item list-group-item-action border-0 py-2 {% if request.GET.category == 'all' or not request.GET.category %}active{% endif %}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>All Categories</span>
+                                </div>
+                            </a>
+                            {% for cat_value, cat_display in categories %}
+                            <a href="?category={{ cat_value }}" 
+                               class="list-group-item list-group-item-action border-0 py-2 {% if request.GET.category == cat_value %}active{% endif %}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>{{ cat_display }}</span>
+                                    <span class="badge bg-light text-dark rounded-pill">
+                                        {% for key, count in category_counts.items %}
+                                            {% if key == cat_value %}{{ count }}{% endif %}
+                                        {% empty %}
+                                            0
+                                        {% endfor %}
+                                    </span>
+                                </div>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <!-- Date Range -->
+                    <div class="mb-3">
+                        <h6 class="mb-3">Date Range</h6>
+                        <form method="get" id="dateFilterForm">
+                            <input type="hidden" name="status" value="{{ request.GET.status|default:'' }}">
+                            <input type="hidden" name="category" value="{{ request.GET.category|default:'' }}">
+                            
+                            <div class="mb-3">
+                                <label class="form-label small mb-1">From Date</label>
+                                <input type="date" name="start_date" class="form-control form-control-sm" 
+                                       value="{{ request.GET.start_date|default:'' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small mb-1">To Date</label>
+                                <input type="date" name="end_date" class="form-control form-control-sm" 
+                                       value="{{ request.GET.end_date|default:'' }}">
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-primary w-100 mb-2">Apply</button>
+                            <a href="{% url 'history' %}" class="btn btn-sm btn-outline-secondary w-100">Clear Filters</a>
+                        </form>
+                    </div>
+                    
+                    <!-- Quick Stats -->
+                    <div class="mt-4 pt-3 border-top">
+                        <h6 class="mb-3">Quick Stats</h6>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="small text-muted">Total Records:</span>
+                            <span class="fw-semibold">{{ total_records }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="small text-muted">This Month:</span>
+                            <span class="fw-semibold">{{ this_month_count|default:0 }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="small text-muted">Avg. Confidence:</span>
+                            <span class="fw-semibold">{{ avg_confidence|default:0|floatformat:1 }}%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-9 col-xl-10">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-history me-2"></i>ECG History
+                    </h2>
+                    <p class="text-muted mb-0">
+                        View and manage all your ECG analysis records
+                        {% if request.GET.status or request.GET.category or request.GET.start_date %}
+                        <span class="ms-2 small">
+                            <i class="fas fa-filter"></i> Filters applied
+                        </span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div>
+                    <a href="{% url 'upload' %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>New Analysis
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Stats Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Total Records</h6>
+                                    <h3 class="mb-0">{{ total_records }}</h3>
+                                </div>
+                                <div class="bg-primary bg-opacity-10 p-3 rounded">
+                                    <i class="fas fa-file-medical-alt text-primary fa-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Completed</h6>
+                                    <h3 class="mb-0">{{ completed_count|default:0 }}</h3>
+                                </div>
+                                <div class="bg-success bg-opacity-10 p-3 rounded">
+                                    <i class="fas fa-check-circle text-success fa-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Avg. Confidence</h6>
+                                    <h3 class="mb-0">{{ avg_confidence|default:0|floatformat:1 }}%</h3>
+                                </div>
+                                <div class="bg-info bg-opacity-10 p-3 rounded">
+                                    <i class="fas fa-chart-line text-info fa-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-2">Most Common</h6>
+                                    <h3 class="mb-0">{{ most_common_category|default:"N/A" }}</h3>
+                                </div>
+                                <div class="bg-warning bg-opacity-10 p-3 rounded">
+                                    <i class="fas fa-chart-pie text-warning fa-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {% if page_obj %}
+            <!-- Records Table -->
+            <div class="card">
+                <div class="card-header bg-white border-bottom-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Analysis Records</h5>
+                        <div class="d-flex gap-2">
+                            <div class="input-group input-group-sm" style="width: 200px;">
+                                <input type="text" class="form-control" placeholder="Search..." id="searchInput">
+                                <button class="btn btn-outline-secondary" type="button">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" 
+                                        data-bs-toggle="dropdown">
+                                    <i class="fas fa-download me-1"></i> Export
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#"><i class="fas fa-file-csv me-2"></i> CSV</a></li>
+                                    <li><a class="dropdown-item" href="#"><i class="fas fa-file-pdf me-2"></i> PDF</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="ps-4">ID</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                    <th>Prediction</th>
+                                    <th>Confidence</th>
+                                    <th>Probabilities</th>
+                                    <th class="text-end pe-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ecg in page_obj %}
+                                <tr class="record-card record-{{ ecg.predicted_category|default:'unknown' }}">
+                                    <td class="ps-4 fw-semibold">#{{ ecg.id }}</td>
+                                    <td>
+                                        <div class="d-flex flex-column">
+                                            <span class="small">{{ ecg.upload_date|date:"M d, Y" }}</span>
+                                            <span class="text-muted smaller">{{ ecg.upload_date|date:"h:i A" }}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge status-{{ ecg.status }}">
+                                            {% if ecg.status == 'completed' %}
+                                            <i class="fas fa-check-circle me-1"></i>
+                                            {% elif ecg.status == 'processing' %}
+                                            <i class="fas fa-sync-alt me-1 fa-spin"></i>
+                                            {% else %}
+                                            <i class="fas fa-exclamation-circle me-1"></i>
+                                            {% endif %}
+                                            {{ ecg.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if ecg.predicted_category %}
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge 
+                                                {% if ecg.predicted_category == 'normal' %}bg-success
+                                                {% elif ecg.predicted_category == 'abnormal' %}bg-warning
+                                                {% elif ecg.predicted_category == 'mi' %}bg-danger
+                                                {% else %}bg-secondary{% endif %} me-2">
+                                                {{ ecg.get_predicted_category_display }}
+                                            </span>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ecg.confidence %}
+                                        <div class="d-flex align-items-center">
+                                            <span class="fw-semibold me-2">{{ ecg.confidence|floatformat:1 }}%</span>
+                                            <div class="probability-bar" style="width: 100px;">
+                                                <div class="probability-fill bg-primary" 
+                                                     style="width: {{ ecg.confidence }}%"></div>
+                                            </div>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ecg.status == 'completed' %}
+                                        <div class="d-flex gap-1">
+                                            <span class="badge bg-success" title="Normal: {{ ecg.normal_prob|floatformat:1 }}%">
+                                                N: {{ ecg.normal_prob|floatformat:0 }}%
+                                            </span>
+                                            <span class="badge bg-warning" title="Abnormal: {{ ecg.abnormal_prob|floatformat:1 }}%">
+                                                A: {{ ecg.abnormal_prob|floatformat:0 }}%
+                                            </span>
+                                            <span class="badge bg-danger" title="MI: {{ ecg.mi_prob|floatformat:1 }}%">
+                                                MI: {{ ecg.mi_prob|floatformat:0 }}%
+                                            </span>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'ecg_result' ecg.id %}" 
+                                               class="btn btn-outline-primary">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="#" class="btn btn-outline-secondary" data-bs-toggle="dropdown">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </a>
+                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                <li>
+                                                    <a class="dropdown-item" href="{% url 'ecg_result' ecg.id %}">
+                                                        <i class="fas fa-chart-bar me-2"></i>View Details
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item" href="#">
+                                                        <i class="fas fa-redo me-2"></i>Re-analyze
+                                                    </a>
+                                                </li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li>
+                                                    <a class="dropdown-item text-danger" href="#">
+                                                        <i class="fas fa-trash me-2"></i>Delete
+                                                    </a>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {% if page_obj.has_other_pages %}
+                    <!-- Pagination -->
+                    <div class="card-footer bg-white border-top">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="text-muted small">
+                                Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} records
+                            </div>
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination pagination-sm mb-0">
+                                    {% if page_obj.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=1{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                            <i class="fas fa-angle-double-left"></i>
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                            <i class="fas fa-angle-left"></i>
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    
+                                    {% for num in page_obj.paginator.page_range %}
+                                        {% if page_obj.number == num %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ num }}</span>
+                                        </li>
+                                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ num }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                                        </li>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    {% if page_obj.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                            <i class="fas fa-angle-right"></i>
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                            <i class="fas fa-angle-double-right"></i>
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Empty State for No Results -->
+            {% else %}
+            <div class="card">
+                <div class="empty-state">
+                    <i class="fas fa-file-medical-alt display-1 text-muted mb-4"></i>
+                    <h4 class="mb-3">No ECG Records Found</h4>
+                    <p class="text-muted mb-4">
+                        {% if request.GET.status or request.GET.category or request.GET.start_date %}
+                        No records match your current filters. Try adjusting your filters.
+                        {% else %}
+                        You haven't uploaded any ECG images yet. Start by uploading your first ECG for analysis.
+                        {% endif %}
+                    </p>
+                    <a href="{% url 'upload' %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Upload First ECG
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Recent Activity -->
+            {% if recent_activity %}
+            <div class="card mt-4">
+                <div class="card-header bg-white border-bottom-0">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>Recent Activity
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="chart-container">
+                                <canvas id="activityChart" height="150"></canvas>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex flex-column h-100 justify-content-center">
+                                <h6 class="text-muted mb-3">Trend Summary</h6>
+                                <div class="mb-3">
+                                    <span class="badge bg-success bg-opacity-10 text-success me-2">+12%</span>
+                                    <span class="small">Increase from last month</span>
+                                </div>
+                                <div class="mb-3">
+                                    <span class="badge bg-primary bg-opacity-10 text-primary me-2">Avg 3/day</span>
+                                    <span class="small">Daily upload average</span>
+                                </div>
+                                <div>
+                                    <span class="badge bg-info bg-opacity-10 text-info me-2">Peak: {{ peak_day|default:"Mon" }}</span>
+                                    <span class="small">Most active day</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+$(document).ready(function() {
+    // Search functionality
+    $('#searchInput').on('keyup', function() {
+        const value = $(this).val().toLowerCase();
+        $('table tbody tr').filter(function() {
+            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
+        });
+    });
+    
+    // Date picker enhancement
+    $('input[type="date"]').each(function() {
+        $(this).attr('max', new Date().toISOString().split('T')[0]);
+    });
+    
+    // Activity Chart
+    const ctx = document.getElementById('activityChart');
+    if (ctx) {
+        const activityChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                datasets: [{
+                    label: 'ECG Uploads',
+                    data: [12, 19, 15, 25, 22, 30],
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 5
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Filter form submission
+    $('#dateFilterForm').on('submit', function(e) {
+        const startDate = $('input[name="start_date"]').val();
+        const endDate = $('input[name="end_date"]').val();
+        
+        if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+            e.preventDefault();
+            alert('Start date must be before end date.');
+            return false;
+        }
+    });
+    
+    // Highlight active filters
+    $('.list-group-item.active').parents('.card').addClass('border-primary');
+});
+</script>
+
+<!-- Custom template filter for getting dictionary items -->
+<script>
+// Add this to your Django template filters or create a custom filter
+// This is a workaround for template context
+document.addEventListener('DOMContentLoaded', function() {
+    // This would normally be handled in Django views
+    console.log('History page loaded');
+});
+</script>
+{% endblock %}
