@@ -306,6 +306,60 @@
             </div>
             <!-- ══════════════ END LIME CARD ══════════════ -->
             
+            {% if previous_ecg %}
+            <!-- Comparison Card -->
+            <div class="result-card" style="border-left: 5px solid #38bdf8;">
+                <h4 class="mb-4">
+                    <i class="fas fa-columns me-2"></i>Comparison with Previous ECG
+                </h4>
+                
+                <div class="row align-items-center">
+                    <!-- Previous Scan -->
+                    <div class="col-md-4 text-center border-end">
+                        <h6 class="text-muted mb-2">Previous Scan ({{ previous_ecg.upload_date|date:"M d, Y" }})</h6>
+                        <span class="badge mb-3 bg-{% if previous_ecg.predicted_category == 'normal' %}success{% elif previous_ecg.predicted_category == 'abnormal' %}warning{% else %}danger{% endif %}">
+                            {{ previous_ecg.get_predicted_category_display }}
+                        </span>
+                        <div style="font-size: 0.9rem; margin-bottom: 10px;">
+                            <span class="text-muted">Confidence:</span> <strong class="text-{% if previous_ecg.confidence > 90 %}success{% elif previous_ecg.confidence > 70 %}warning{% else %}danger{% endif %}">{{ previous_ecg.confidence|floatformat:1 }}%</strong>
+                        </div>
+                        <img src="{{ previous_ecg.image.url }}" alt="Previous ECG" class="img-fluid rounded shadow-sm" style="max-height: 200px;">
+                        <div class="mt-3">
+                            <a href="{% url 'ecg_result' previous_ecg.id %}" class="btn btn-sm btn-outline-info">
+                                <i class="fas fa-external-link-alt me-1"></i>View Details
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Current Scan -->
+                    <div class="col-md-4 text-center border-end">
+                        <h6 class="text-primary mb-2">Current Scan ({{ record.upload_date|date:"M d, Y" }})</h6>
+                        <span class="badge mb-3 bg-{% if record.predicted_category == 'normal' %}success{% elif record.predicted_category == 'abnormal' %}warning{% else %}danger{% endif %}">
+                            {{ record.get_predicted_category_display }}
+                        </span>
+                        <div style="font-size: 0.9rem; margin-bottom: 10px;">
+                            <span class="text-muted">Confidence:</span> <strong class="text-{% if record.confidence > 90 %}success{% elif record.confidence > 70 %}warning{% else %}danger{% endif %}">{{ record.confidence|floatformat:1 }}%</strong>
+                        </div>
+                        <img src="{{ record.image.url }}" alt="Current ECG" class="img-fluid rounded shadow-sm" style="max-height: 200px;">
+                    </div>
+
+                    <!-- Progress Report -->
+                    <div class="col-md-4">
+                        <h6 class="text-info mb-3 ps-2"><i class="fas fa-list-ul me-2"></i>Immediate Report</h6>
+                        <ul class="list-group list-group-flush text-start" style="font-size: 0.9rem;">
+                            {% for point in trend_points %}
+                                <li class="list-group-item bg-transparent px-2 border-0 mb-2" style="background: rgba(14, 165, 233, 0.05); border-radius: 8px;">
+                                    <i class="{{ point.icon }} me-2"></i>
+                                    <strong style="color: #334155;">{{ point.label }}:</strong>
+                                    <span style="color: #475569;">{{ point.value }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Probability Distribution -->
             <div class="result-card">
                 <h4 class="mb-4">
@@ -431,12 +485,12 @@
 </div>
 
 <script>
-$(document).ready(function() {
+document.addEventListener("DOMContentLoaded", function() {
     // ── Animate probability bars ──────────────────────────────────────────────
-    $('.probability-fill').each(function() {
-        const width = $(this).css('width');
-        $(this).css('width', '0');
-        setTimeout(() => { $(this).animate({width: width}, 1000); }, 500);
+    document.querySelectorAll('.probability-fill').forEach(function(bar) {
+        const width = bar.style.width;
+        bar.style.width = '0';
+        setTimeout(() => { bar.style.width = width; }, 500);
     });
 
     // ── LIME: Opacity Slider ──────────────────────────────────────────────────
@@ -489,15 +543,17 @@ $(document).ready(function() {
     function switchLimeClass(cls) {
         if (!limeCache || !limeCache.is_ready) return;
 
-        $('.lime-class-btn').removeClass('active');
-        $(`#btn-${cls}`).addClass('active');
+        document.querySelectorAll('.lime-class-btn').forEach(btn => btn.classList.remove('active'));
+        const activeBtn = document.getElementById('btn-' + cls);
+        if (activeBtn) activeBtn.classList.add('active');
 
         // Swap image
         const imgUrl = limeCache.lime_images[cls];
         if (imgUrl) {
-            $('#lime-overlay-img').attr('src', imgUrl).show();
+            overlayImg.setAttribute('src', imgUrl);
+            overlayImg.style.display = 'block';
         } else {
-            $('#lime-overlay-img').hide();
+            overlayImg.style.display = 'none';
         }
 
         // Swap weights table (extract .weights from the inner object)
@@ -509,21 +565,29 @@ $(document).ready(function() {
     }
 
     // Button click handler
-    $('.lime-class-btn').on('click', function() {
-        switchLimeClass($(this).data('class'));
+    document.querySelectorAll('.lime-class-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            switchLimeClass(this.getAttribute('data-class'));
+        });
     });
 
     // Polling function
     function checkLimeStatus() {
-        $.ajax({
-            url: limeDataUrl,
-            dataType: 'json',
-            cache: false, // Prevent browser from caching is_ready: false
-            success: function(data) {
+        fetch(limeDataUrl, { cache: "no-store" })
+            .then(res => {
+                if (!res.ok) throw new Error("Server Error");
+                return res.json();
+            })
+            .then(data => {
                 if (data.is_ready) {
                     limeCache = data;
-                    $('#lime-loading-state').hide();
-                    $('#lime-controls').fadeIn();
+                    document.getElementById('lime-loading-state').style.display = 'none';
+                    
+                    const controls = document.getElementById('lime-controls');
+                    controls.style.display = 'block';
+                    controls.style.opacity = 0;
+                    setTimeout(() => controls.style.opacity = 1, 50);
+                    controls.style.transition = "opacity 0.4s ease-in";
                     
                     // Activate predicted class by default
                     const predictedClass = "{{ record.predicted_category }}";
@@ -532,11 +596,10 @@ $(document).ready(function() {
                     // Not ready, poll again in 3s
                     setTimeout(checkLimeStatus, 3000);
                 }
-            },
-            error: function() {
-                $('#lime-loading-state').html('<p style="color:#ef4444;">Error generating explanation.</p>');
-            }
-        });
+            })
+            .catch(error => {
+                document.getElementById('lime-loading-state').innerHTML = '<p style="color:#ef4444;">Error generating explanation.</p>';
+            });
     }
 
     // Start polling immediately on page load

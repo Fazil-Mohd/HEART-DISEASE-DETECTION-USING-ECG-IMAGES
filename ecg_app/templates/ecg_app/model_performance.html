@@ -1,0 +1,848 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Model Performance Dashboard – ECG Classifier{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────── */
+  :root {
+    --med-primary:   #0d6efd;
+    --med-secondary: #0a58ca;
+    --med-accent:    #17a2b8;
+    --med-success:   #198754;
+    --med-warning:   #ffc107;
+    --med-danger:    #dc3545;
+    --med-dark:      #0d1b2a;
+    --med-surface:   #ffffff;
+    --med-bg:        #f0f4f8;
+    --med-border:    #e2e8f0;
+    --card-radius:   16px;
+    --shadow-sm:     0 2px 8px rgba(0,0,0,.07);
+    --shadow-md:     0 6px 24px rgba(0,0,0,.1);
+    --shadow-lg:     0 12px 40px rgba(0,0,0,.14);
+  }
+
+  /* ── Page background ───────────────────────────────────────────────── */
+  body { background: var(--med-bg) !important; }
+
+  /* ── Hero header ───────────────────────────────────────────────────── */
+  .perf-hero {
+    background: linear-gradient(135deg, #0d1b2a 0%, #1a3a5c 50%, #0d6efd 100%);
+    padding: 3rem 0 2.5rem;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+  .perf-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 120'%3E%3Cpath fill='rgba(255,255,255,.04)' d='M0,60 C240,120 480,0 720,60 C960,120 1200,0 1440,60 L1440,120 L0,120Z'/%3E%3C/svg%3E") bottom/cover no-repeat;
+  }
+  .perf-hero .badge-model {
+    background: rgba(255,255,255,.15);
+    border: 1px solid rgba(255,255,255,.3);
+    backdrop-filter: blur(6px);
+    color: #fff;
+    font-size: .8rem;
+    padding: .4rem .9rem;
+    border-radius: 50px;
+    letter-spacing: .5px;
+  }
+  .perf-hero h1 { font-size: clamp(1.5rem, 4vw, 2.4rem); font-weight: 800; letter-spacing: -.5px; }
+  .perf-hero p  { color: rgba(255,255,255,.8); max-width: 640px; }
+  .hero-stat { text-align:center; }
+  .hero-stat .value { font-size: 2rem; font-weight: 800; }
+  .hero-stat .label { font-size: .75rem; color: rgba(255,255,255,.7); letter-spacing: 1px; text-transform: uppercase; }
+
+  /* ── Section headings ──────────────────────────────────────────────── */
+  .section-heading {
+    font-size: 1.1rem; font-weight: 700;
+    color: var(--med-dark);
+    border-left: 4px solid var(--med-primary);
+    padding-left: .75rem;
+    margin-bottom: 1.25rem;
+  }
+  .section-heading i { color: var(--med-primary); }
+
+  /* ── Metric cards ──────────────────────────────────────────────────── */
+  .metric-dash-card {
+    background: var(--med-surface);
+    border-radius: var(--card-radius);
+    padding: 1.5rem 1.25rem;
+    box-shadow: var(--shadow-sm);
+    border-top: 4px solid transparent;
+    transition: transform .25s, box-shadow .25s;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .metric-dash-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+  .metric-dash-card.accent-blue   { border-top-color: #0d6efd; }
+  .metric-dash-card.accent-green  { border-top-color: #198754; }
+  .metric-dash-card.accent-purple { border-top-color: #6f42c1; }
+  .metric-dash-card.accent-teal   { border-top-color: #0dcaf0; }
+  .metric-dash-card .icon-wrap {
+    width: 52px; height: 52px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto .9rem;
+    font-size: 1.4rem;
+  }
+  .accent-blue   .icon-wrap { background: rgba(13,110,253,.1); color: #0d6efd; }
+  .accent-green  .icon-wrap { background: rgba(25,135,84,.1);  color: #198754; }
+  .accent-purple .icon-wrap { background: rgba(111,66,193,.1); color: #6f42c1; }
+  .accent-teal   .icon-wrap { background: rgba(13,202,240,.1); color: #0dcaf0; }
+  .metric-dash-card .metric-value {
+    font-size: 2.4rem; font-weight: 800;
+    line-height: 1; margin-bottom: .25rem;
+  }
+  .accent-blue   .metric-value { color: #0d6efd; }
+  .accent-green  .metric-value { color: #198754; }
+  .accent-purple .metric-value { color: #6f42c1; }
+  .accent-teal   .metric-value { color: #0dcaf0; }
+  .metric-dash-card .metric-label { font-size: .8rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; }
+
+  /* ── Content cards ─────────────────────────────────────────────────── */
+  .content-card {
+    background: var(--med-surface);
+    border-radius: var(--card-radius);
+    box-shadow: var(--shadow-sm);
+    padding: 1.75rem;
+    border: 1px solid var(--med-border);
+    height: 100%;
+  }
+  .content-card:hover { box-shadow: var(--shadow-md); }
+
+  /* ── Image panels ──────────────────────────────────────────────────── */
+  .graph-img-wrap {
+    border-radius: 12px;
+    overflow: hidden;
+    background: #f8fafc;
+    border: 1px solid var(--med-border);
+    text-align: center;
+    padding: .5rem;
+  }
+  .graph-img-wrap img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    transition: transform .3s;
+    cursor: zoom-in;
+  }
+  .graph-img-wrap img:hover { transform: scale(1.02); }
+  .img-caption {
+    font-size: .78rem;
+    color: #64748b;
+    text-align: center;
+    margin-top: .5rem;
+    font-style: italic;
+  }
+
+  /* ── Phase toggle ──────────────────────────────────────────────────── */
+  .phase-toggle .btn {
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: .85rem;
+    padding: .45rem 1.2rem;
+  }
+  .phase-toggle .btn.active {
+    background: var(--med-primary);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(13,110,253,.35);
+  }
+  .phase-toggle .btn:not(.active) {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+  }
+
+  /* ── Classification report table ───────────────────────────────────── */
+  .report-table { font-size: .88rem; }
+  .report-table thead th {
+    background: linear-gradient(135deg, #0d1b2a, #1a3a5c);
+    color: #fff;
+    font-weight: 600;
+    border: none;
+    padding: .75rem 1rem;
+  }
+  .report-table thead th:first-child { border-radius: 8px 0 0 0; }
+  .report-table thead th:last-child  { border-radius: 0 8px 0 0; }
+  .report-table tbody tr { transition: background .15s; }
+  .report-table tbody tr:hover { background: #f0f7ff; }
+  .report-table tbody td { padding: .65rem 1rem; vertical-align: middle; }
+  .report-table .class-badge {
+    display: inline-block;
+    padding: .25rem .65rem;
+    border-radius: 50px;
+    font-size: .78rem;
+    font-weight: 600;
+    letter-spacing: .4px;
+  }
+  .class-badge.normal   { background: #d1fae5; color: #065f46; }
+  .class-badge.abnormal { background: #fee2e2; color: #991b1b; }
+  .class-badge.mi       { background: #fff3cd; color: #854d0e; }
+  .class-badge.post_mi  { background: #ede9fe; color: #4c1d95; }
+  .class-badge.macro    { background: #dbeafe; color: #1e40af; }
+  .class-badge.weighted { background: #f3f4f6; color: #374151; }
+  .score-bar-cell { min-width: 140px; }
+  .score-mini-bar {
+    height: 6px; border-radius: 3px;
+    background: #e2e8f0; margin-top: 4px;
+  }
+  .score-mini-bar-fill { height: 100%; border-radius: 3px; }
+
+  /* ── Insight cards ─────────────────────────────────────────────────── */
+  .insight-card {
+    border-radius: var(--card-radius);
+    padding: 1.5rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid transparent;
+    height: 100%;
+  }
+  .insight-card.best    { background: #f0fdf4; border-color: #bbf7d0; }
+  .insight-card.worst   { background: #fef9ec; border-color: #fde68a; }
+  .insight-card.overfit-good  { background: #f0fdf4; border-color: #bbf7d0; }
+  .insight-card.overfit-warn  { background: #fef2f2; border-color: #fecaca; }
+  .insight-card.overfit-info  { background: #eff6ff; border-color: #bfdbfe; }
+  .insight-icon { font-size: 2rem; flex-shrink: 0; margin-top: .15rem; }
+  .insight-card h6 { font-weight: 700; margin-bottom: .35rem; font-size: .95rem; }
+  .insight-card p  { font-size: .84rem; color: #475569; margin: 0; }
+
+  /* ── AUC legend table ──────────────────────────────────────────────── */
+  .auc-legend { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+  .auc-badge  {
+    display: inline-flex; align-items: center; gap: .4rem;
+    background: #f8fafc; border: 1px solid #e2e8f0;
+    border-radius: 50px; padding: .3rem .8rem;
+    font-size: .8rem; font-weight: 600;
+  }
+  .auc-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+  /* ── Download button ───────────────────────────────────────────────── */
+  .btn-download {
+    background: linear-gradient(135deg, #0d6efd, #0a58ca);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: .6rem 1.5rem;
+    font-weight: 600;
+    font-size: .9rem;
+    box-shadow: 0 3px 12px rgba(13,110,253,.3);
+    transition: all .25s;
+  }
+  .btn-download:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(13,110,253,.4); color: #fff; }
+
+  /* ── Scroll animation ──────────────────────────────────────────────── */
+  .fade-in { opacity: 0; transform: translateY(20px); transition: opacity .5s ease, transform .5s ease; }
+  .fade-in.visible { opacity: 1; transform: none; }
+
+  /* ── Print / PDF styles ────────────────────────────────────────────── */
+  @media print {
+    .perf-hero, .content-card, .insight-card { break-inside: avoid; }
+    .btn-download, nav, footer { display: none !important; }
+    body { background: #fff !important; }
+    .content-card { box-shadow: none; border: 1px solid #ccc; }
+    canvas { max-width: 100% !important; }
+  }
+
+  /* ── Responsive tweaks ─────────────────────────────────────────────── */
+  @media (max-width: 767px) {
+    .metric-dash-card .metric-value { font-size: 1.8rem; }
+    .hero-stat .value { font-size: 1.5rem; }
+  }
+</style>
+{% endblock %}
+
+
+{% block content %}
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     HERO HEADER
+══════════════════════════════════════════════════════════════════════ -->
+<section class="perf-hero">
+  <div class="container position-relative">
+    <div class="row align-items-center gy-4">
+      <div class="col-lg-7">
+        <span class="badge-model mb-3 d-inline-block">
+          <i class="fas fa-brain me-1"></i> ResNet50 · ECG Image Classification · Phase 1 + Phase 2 Fine-Tuning
+        </span>
+        <h1 class="mb-2">ECG Classification<br>Model Performance Dashboard</h1>
+        <p class="mb-0">
+          Comprehensive evaluation of a ResNet50-based deep learning classifier trained to detect
+          four cardiac conditions from 12-lead ECG images. All metrics are computed on the
+          held-out validation split (20% stratified).
+        </p>
+      </div>
+      <div class="col-lg-5">
+        <div class="row g-3 text-white">
+          <div class="col-4 hero-stat">
+            <div class="value">{{ overall_accuracy }}%</div>
+            <div class="label">Val Accuracy</div>
+          </div>
+          <div class="col-4 hero-stat">
+            <div class="value">4</div>
+            <div class="label">Classes</div>
+          </div>
+          <div class="col-4 hero-stat">
+            <div class="value">{{ phase1_epochs|add:phase2_epochs }}</div>
+            <div class="label">Total Epochs</div>
+          </div>
+        </div>
+        <div class="mt-3 d-flex justify-content-end">
+          <button class="btn-download" onclick="window.print()">
+            <i class="fas fa-file-pdf me-2"></i>Download PDF Report
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="container py-4">
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       SECTION 1 · PREDICTION SUMMARY METRIC CARDS
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="row g-4 mb-4 fade-in">
+    <div class="col-12">
+      <h5 class="section-heading"><i class="fas fa-bullseye me-2"></i>Prediction Summary</h5>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="metric-dash-card accent-blue h-100" data-bs-toggle="tooltip" title="Overall validation accuracy across all 4 classes">
+        <div class="icon-wrap"><i class="fas fa-check-double"></i></div>
+        <div class="metric-value" id="val-accuracy">0</div>
+        <div class="metric-label">Accuracy</div>
+        <small class="text-muted d-block mt-1" style="font-size:.72rem">Validation set</small>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="metric-dash-card accent-green h-100" data-bs-toggle="tooltip" title="Macro-averaged precision across all classes">
+        <div class="icon-wrap"><i class="fas fa-crosshairs"></i></div>
+        <div class="metric-value" id="val-precision">0</div>
+        <div class="metric-label">Precision</div>
+        <small class="text-muted d-block mt-1" style="font-size:.72rem">Macro average</small>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="metric-dash-card accent-purple h-100" data-bs-toggle="tooltip" title="Macro-averaged recall (sensitivity) across all classes">
+        <div class="icon-wrap"><i class="fas fa-search"></i></div>
+        <div class="metric-value" id="val-recall">0</div>
+        <div class="metric-label">Recall</div>
+        <small class="text-muted d-block mt-1" style="font-size:.72rem">Macro average</small>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="metric-dash-card accent-teal h-100" data-bs-toggle="tooltip" title="Macro-averaged F1-score – harmonic mean of precision and recall">
+        <div class="icon-wrap"><i class="fas fa-balance-scale"></i></div>
+        <div class="metric-value" id="val-f1">0</div>
+        <div class="metric-label">F1-Score</div>
+        <small class="text-muted d-block mt-1" style="font-size:.72rem">Macro average</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       SECTION 2 · CONFUSION MATRIX + ROC-AUC
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="row g-4 mb-4 fade-in">
+    <!-- Confusion Matrix -->
+    <div class="col-lg-6">
+      <div class="content-card">
+        <h5 class="section-heading"><i class="fas fa-th me-2"></i>Confusion Matrix (Normalised)</h5>
+        <p class="text-muted mb-3" style="font-size:.85rem">
+          Each cell shows the fraction of true-class samples predicted as each class.
+          Diagonal cells (dark blue) represent correct predictions; off-diagonal cells are misclassifications.
+        </p>
+        <div class="graph-img-wrap">
+          <img src="{% static 'ecg_app/graphs/confusion_matrix_normalized.png' %}"
+               alt="Normalised Confusion Matrix"
+               id="cm-img">
+        </div>
+        <p class="img-caption mt-2">
+          <i class="fas fa-info-circle me-1"></i>
+          Values are row-normalised (per true class). Darker = higher fraction.
+        </p>
+      </div>
+    </div>
+
+    <!-- ROC-AUC -->
+    <div class="col-lg-6">
+      <div class="content-card">
+        <h5 class="section-heading"><i class="fas fa-chart-area me-2"></i>ROC-AUC Curves (One-vs-Rest)</h5>
+        <p class="text-muted mb-3" style="font-size:.85rem">
+          Each curve shows the trade-off between true positive rate and false positive rate at varying thresholds.
+          AUC closer to 1.0 = better discrimination.
+        </p>
+        <div class="graph-img-wrap">
+          <img src="{% static 'ecg_app/graphs/roc_auc_curves.png' %}"
+               alt="ROC-AUC Curves">
+        </div>
+        <div class="auc-legend">
+          <span class="auc-badge"><span class="auc-dot" style="background:#E91E63"></span>Abnormal Heartbeat</span>
+          <span class="auc-badge"><span class="auc-dot" style="background:#2196F3"></span>Myocardial Infarction</span>
+          <span class="auc-badge"><span class="auc-dot" style="background:#4CAF50"></span>Normal ECG</span>
+          <span class="auc-badge"><span class="auc-dot" style="background:#FF9800"></span>Post MI History</span>
+          <span class="auc-badge"><span class="auc-dot" style="background:#555;border:1px dashed #bbb"></span>Random Baseline</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       SECTION 3 · TRAINING PERFORMANCE (Phase Toggle + Charts)
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="row g-4 mb-4 fade-in">
+    <div class="col-12">
+      <div class="content-card">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+          <h5 class="section-heading mb-0"><i class="fas fa-chart-line me-2"></i>Training Performance</h5>
+          <div class="phase-toggle d-flex gap-2">
+            <button class="btn active" id="btn-phase1" onclick="switchPhase(1)">
+              <i class="fas fa-layer-group me-1"></i>Phase 1
+              <span class="badge bg-secondary ms-1" style="font-size:.7rem">{{ phase1_epochs }} epochs</span>
+            </button>
+            <button class="btn" id="btn-phase2" onclick="switchPhase(2)">
+              <i class="fas fa-fire me-1"></i>Phase 2 (Fine-tune)
+              <span class="badge bg-secondary ms-1" style="font-size:.7rem">{{ phase2_epochs }} epochs</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Phase description -->
+        <div id="phase-desc" class="alert alert-info border-0 py-2 mb-3" style="font-size:.84rem; background:#eff6ff; color:#1e40af;">
+          <i class="fas fa-info-circle me-1"></i>
+          <span id="phase-desc-text">
+            <strong>Phase 1 — Classifier Head Training:</strong>
+            The ResNet50 backbone was frozen; only the custom classification head was trained with a higher learning rate to quickly learn ECG-specific features.
+          </span>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div style="position:relative; height:260px;">
+              <canvas id="accuracyChart"></canvas>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div style="position:relative; height:260px;">
+              <canvas id="lossChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       SECTION 4 · PER-CLASS PERFORMANCE + CLASSIFICATION REPORT TABLE
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="row g-4 mb-4 fade-in">
+    <!-- Per-class bar chart -->
+    <div class="col-lg-6">
+      <div class="content-card">
+        <h5 class="section-heading"><i class="fas fa-th-list me-2"></i>Per-Class Performance</h5>
+        <p class="text-muted mb-3" style="font-size:.85rem">
+          Precision, Recall, and F1-Score for each of the four cardiac condition classes.
+        </p>
+        <div style="position:relative; height:300px;">
+          <canvas id="perClassChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Classification report table -->
+    <div class="col-lg-6">
+      <div class="content-card">
+        <h5 class="section-heading"><i class="fas fa-table me-2"></i>Classification Report</h5>
+        <div class="table-responsive">
+          <table class="table report-table table-borderless">
+            <thead>
+              <tr>
+                <th>Class</th>
+                <th class="text-center">Precision</th>
+                <th class="text-center">Recall</th>
+                <th class="text-center">F1-Score</th>
+                <th class="text-center">Support</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for cls, m in class_metrics.items %}
+              <tr>
+                <td>
+                  <span class="class-badge {{ cls }}">
+                    {% if cls == 'normal' %}Normal ECG
+                    {% elif cls == 'abnormal' %}Abnormal Heartbeat
+                    {% elif cls == 'mi' %}Myocardial Infarction
+                    {% elif cls == 'post_mi' %}Post MI History
+                    {% else %}{{ cls }}{% endif %}
+                  </span>
+                </td>
+                <td class="text-center score-bar-cell">
+                  <strong>{{ m.precision|floatformat:4 }}</strong>
+                  <div class="score-mini-bar"><div class="score-mini-bar-fill" style="width:{{ m.precision_pct }}%; background:#0d6efd;"></div></div>
+                </td>
+                <td class="text-center score-bar-cell">
+                  <strong>{{ m.recall|floatformat:4 }}</strong>
+                  <div class="score-mini-bar"><div class="score-mini-bar-fill" style="width:{{ m.recall_pct }}%; background:#198754;"></div></div>
+                </td>
+                <td class="text-center score-bar-cell">
+                  <strong>{{ m.f1|floatformat:4 }}</strong>
+                  <div class="score-mini-bar"><div class="score-mini-bar-fill" style="width:{{ m.f1_pct }}%; background:#6f42c1;"></div></div>
+                </td>
+                <td class="text-center"><span class="badge bg-light text-dark border">{{ m.support }}</span></td>
+              </tr>
+              {% endfor %}
+              <tr class="table-light fw-semibold">
+                <td><span class="class-badge macro">Macro Avg</span></td>
+                <td class="text-center">{{ macro_precision|floatformat:2 }}%</td>
+                <td class="text-center">{{ macro_recall|floatformat:2 }}%</td>
+                <td class="text-center">{{ macro_f1|floatformat:2 }}%</td>
+                <td class="text-center">—</td>
+              </tr>
+              <tr class="fw-bold">
+                <td colspan="4" class="text-end">Overall Accuracy</td>
+                <td class="text-center">
+                  <span class="badge bg-primary fs-6">{{ overall_accuracy }}%</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       SECTION 5 · MODEL INSIGHTS
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="row g-4 mb-5 fade-in">
+    <div class="col-12">
+      <h5 class="section-heading"><i class="fas fa-lightbulb me-2"></i>Model Insights</h5>
+    </div>
+
+    <!-- Best class -->
+    <div class="col-md-4">
+      <div class="insight-card best">
+        <div class="insight-icon">🏆</div>
+        <div>
+          <h6 class="text-success">Best-Performing Class</h6>
+          <p>
+            <strong>
+              {% if best_class == 'normal' %}Normal ECG
+              {% elif best_class == 'mi' %}Myocardial Infarction
+              {% elif best_class == 'abnormal' %}Abnormal Heartbeat
+              {% elif best_class == 'post_mi' %}Post MI History
+              {% else %}{{ best_class }}{% endif %}
+            </strong>
+            achieved the highest F1-Score of
+            <strong class="text-success">{{ best_class_f1 }}%</strong>,
+            indicating the model is highly reliable for this condition.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Worst class -->
+    <div class="col-md-4">
+      <div class="insight-card worst">
+        <div class="insight-icon">⚠️</div>
+        <div>
+          <h6 style="color:#92400e;">Needs Improvement</h6>
+          <p>
+            <strong>
+              {% if worst_class == 'normal' %}Normal ECG
+              {% elif worst_class == 'mi' %}Myocardial Infarction
+              {% elif worst_class == 'abnormal' %}Abnormal Heartbeat
+              {% elif worst_class == 'post_mi' %}Post MI History
+              {% else %}{{ worst_class }}{% endif %}
+            </strong>
+            has the lowest F1-Score of
+            <strong style="color:#b45309;">{{ worst_class_f1 }}%</strong>.
+            Consider data augmentation or class-weight adjustment for this category.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overfitting -->
+    <div class="col-md-4">
+      <div class="insight-card
+        {% if overfit_status == 'good_fit' %}overfit-good
+        {% elif overfit_status == 'overfitting' %}overfit-warn
+        {% else %}overfit-info{% endif %}">
+        <div class="insight-icon">
+          {% if overfit_status == 'good_fit' %}✅
+          {% elif overfit_status == 'overfitting' %}🔴
+          {% else %}🔵{% endif %}
+        </div>
+        <div>
+          <h6 class="{% if overfit_status == 'good_fit' %}text-success{% elif overfit_status == 'overfitting' %}text-danger{% else %}text-primary{% endif %}">
+            {% if overfit_status == 'good_fit' %}Good Generalisation
+            {% elif overfit_status == 'overfitting' %}Potential Overfitting
+            {% else %}Overfitting Analysis{% endif %}
+          </h6>
+          <p>{{ overfit_detail }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Additional context cards -->
+    <div class="col-md-6">
+      <div class="insight-card overfit-info">
+        <div class="insight-icon">🏗️</div>
+        <div>
+          <h6 class="text-primary">Architecture</h6>
+          <p>
+            <strong>ResNet50</strong> backbone pre-trained on ImageNet with a custom dense head
+            (GlobalAvgPool → Dense 256 + Dropout 0.5 → Dense 128 + Dropout 0.3 → Softmax 4-class).
+            Focal Loss (γ=2.0) with label smoothing (0.05) was used to handle class imbalance.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="insight-card best">
+        <div class="insight-icon">📊</div>
+        <div>
+          <h6 class="text-success">Training Strategy</h6>
+          <p>
+            <strong>Two-phase training:</strong> Phase 1 froze the backbone and trained the head for {{ phase1_epochs }} epochs.
+            Phase 2 unfroze all layers for full fine-tuning over {{ phase2_epochs }} epochs with a lower learning rate,
+            achieving the best validation accuracy of <strong class="text-success">{{ overall_accuracy }}%</strong>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- Lightbox Modal for image zoom -->
+<div class="modal fade" id="imgModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content bg-transparent border-0">
+      <div class="modal-body p-0 text-center">
+        <img id="modal-img-src" src="" alt="Zoomed graph" class="img-fluid rounded-3">
+        <button type="button" class="btn btn-light mt-2" data-bs-dismiss="modal">
+          <i class="fas fa-times me-1"></i>Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+<!-- JSON data islands – rendered server-side by Django, not linted as JS by the IDE -->
+<script type="application/json" id="data-phase1">{{ phase1_json|safe }}</script>
+<script type="application/json" id="data-phase2">{{ phase2_json|safe }}</script>
+<script type="application/json" id="data-per-class">{{ per_class_chart_json|safe }}</script>
+<script type="application/json" id="data-metrics">{"accuracy":{{ overall_accuracy }},"precision":{{ macro_precision }},"recall":{{ macro_recall }},"f1":{{ macro_f1 }}}</script>
+
+<script>
+/* Read a JSON data-island by element id */
+function readJSON(id) {
+  var el = document.getElementById(id);
+  return el ? JSON.parse(el.textContent) : null;
+}
+var PHASE1     = readJSON('data-phase1')    || [];
+var PHASE2     = readJSON('data-phase2')    || [];
+var PER_CLASS  = readJSON('data-per-class') || {};
+var METRICS    = readJSON('data-metrics')   || {};
+
+/* Chart.js defaults */
+Chart.defaults.font.family = "'Segoe UI', sans-serif";
+Chart.defaults.font.size   = 12;
+Chart.defaults.color       = '#475569';
+
+/* Training chart helpers */
+function lineOpts(yLabel) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode:'index', intersect:false },
+    plugins: {
+      legend: { position:'top', labels:{ boxWidth:12, padding:14 } },
+      tooltip: {
+        backgroundColor:'rgba(13,27,42,.9)',
+        padding:10,
+        callbacks: {
+          label: function(ctx) { return ' ' + ctx.dataset.label + ': ' + (ctx.parsed.y*100).toFixed(2) + '%'; }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display:false },
+        title: { display:true, text:'Epoch', font:{weight:'600'} }
+      },
+      y: {
+        min:0, max:1,
+        ticks: { callback: function(v) { return (v*100).toFixed(0)+'%'; } },
+        title: { display:true, text:yLabel, font:{weight:'600'} },
+        grid: { color:'rgba(0,0,0,.06)' }
+      }
+    }
+  };
+}
+
+function lossOpts() {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode:'index', intersect:false },
+    plugins: {
+      legend: { position:'top', labels:{ boxWidth:12, padding:14 } },
+      tooltip: {
+        backgroundColor:'rgba(13,27,42,.9)',
+        padding:10,
+        callbacks: {
+          label: function(ctx) { return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(4); }
+        }
+      }
+    },
+    scales: {
+      x: { grid:{ display:false }, title:{ display:true, text:'Epoch', font:{weight:'600'} } },
+      y: { title:{ display:true, text:'Loss', font:{weight:'600'} }, grid:{ color:'rgba(0,0,0,.06)' } }
+    }
+  };
+}
+
+function buildDatasets(phase, type) {
+  var epochs = phase.map(function(r) { return r.epoch; });
+  if (type === 'accuracy') {
+    return {
+      labels: epochs,
+      datasets: [
+        { label:'Train Accuracy',      data: phase.map(function(r){return r.accuracy;}),     borderColor:'#0d6efd', backgroundColor:'rgba(13,110,253,.08)', fill:true, tension:.35, pointRadius:2, pointHoverRadius:5 },
+        { label:'Validation Accuracy', data: phase.map(function(r){return r.val_accuracy;}), borderColor:'#198754', backgroundColor:'rgba(25,135,84,.08)',  fill:true, tension:.35, pointRadius:2, pointHoverRadius:5, borderDash:[5,3] }
+      ]
+    };
+  }
+  return {
+    labels: epochs,
+    datasets: [
+      { label:'Train Loss',      data: phase.map(function(r){return r.loss;}),     borderColor:'#dc3545', backgroundColor:'rgba(220,53,69,.08)',  fill:true, tension:.35, pointRadius:2, pointHoverRadius:5 },
+      { label:'Validation Loss', data: phase.map(function(r){return r.val_loss;}), borderColor:'#fd7e14', backgroundColor:'rgba(253,126,20,.08)', fill:true, tension:.35, pointRadius:2, pointHoverRadius:5, borderDash:[5,3] }
+    ]
+  };
+}
+
+/* Training accuracy + loss charts */
+var accCtx  = document.getElementById('accuracyChart').getContext('2d');
+var lossCtx = document.getElementById('lossChart').getContext('2d');
+
+var accChart  = new Chart(accCtx,  { type:'line', data: buildDatasets(PHASE1,'accuracy'), options: lineOpts('Accuracy') });
+var lossChart = new Chart(lossCtx, { type:'line', data: buildDatasets(PHASE1,'loss'),     options: lossOpts() });
+
+/* Phase toggle */
+var phaseDesc = {
+  1: '<strong>Phase 1 &mdash; Classifier Head Training:</strong> The ResNet50 backbone was frozen; only the custom classification head was trained with a higher learning rate to quickly learn ECG-specific features.',
+  2: '<strong>Phase 2 &mdash; Full Fine-Tuning:</strong> All layers were unfrozen and the entire network was trained end-to-end with a very small learning rate (cosine decay), yielding the final best model.'
+};
+function switchPhase(p) {
+  var data = p === 1 ? PHASE1 : PHASE2;
+  document.getElementById('btn-phase1').classList.toggle('active', p===1);
+  document.getElementById('btn-phase2').classList.toggle('active', p===2);
+  document.getElementById('phase-desc-text').innerHTML = phaseDesc[p];
+  accChart.data  = buildDatasets(data,'accuracy');
+  lossChart.data = buildDatasets(data,'loss');
+  accChart.update('active');
+  lossChart.update('active');
+}
+
+/* Per-class bar chart */
+if (PER_CLASS && PER_CLASS.labels && PER_CLASS.labels.length) {
+  var perClassCtx = document.getElementById('perClassChart').getContext('2d');
+  new Chart(perClassCtx, {
+    type: 'bar',
+    data: {
+      labels: PER_CLASS.labels,
+      datasets: [
+        { label:'Precision', data: PER_CLASS.precision, backgroundColor:'rgba(13,110,253,.75)',  borderColor:'#0d6efd', borderWidth:1.5, borderRadius:6 },
+        { label:'Recall',    data: PER_CLASS.recall,    backgroundColor:'rgba(25,135,84,.75)',   borderColor:'#198754', borderWidth:1.5, borderRadius:6 },
+        { label:'F1-Score',  data: PER_CLASS.f1,        backgroundColor:'rgba(111,66,193,.75)',  borderColor:'#6f42c1', borderWidth:1.5, borderRadius:6 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: { position:'top', labels:{ boxWidth:12, padding:12 } },
+        tooltip: {
+          backgroundColor:'rgba(13,27,42,.9)',
+          padding:10,
+          callbacks: { label: function(ctx) { return ' ' + ctx.dataset.label + ': ' + (ctx.parsed.y*100).toFixed(1) + '%'; } }
+        }
+      },
+      scales: {
+        x: { grid:{ display:false } },
+        y: {
+          min:0, max:1,
+          ticks: { callback: function(v) { return (v*100).toFixed(0)+'%'; } },
+          grid:{ color:'rgba(0,0,0,.06)' }
+        }
+      }
+    }
+  });
+}
+
+/* Animated metric counters */
+function animateCounter(el, target, duration) {
+  duration = duration || 1200;
+  var start = performance.now();
+  function frame(now) {
+    var p    = Math.min((now - start) / duration, 1);
+    var ease = 1 - Math.pow(1 - p, 3);
+    el.textContent = (target * ease).toFixed(1) + '%';
+    if (p < 1) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+var metricTargets = [
+  { id:'val-accuracy',  val: METRICS.accuracy  || 0 },
+  { id:'val-precision', val: METRICS.precision  || 0 },
+  { id:'val-recall',    val: METRICS.recall     || 0 },
+  { id:'val-f1',        val: METRICS.f1         || 0 }
+];
+
+var counterObserver = new IntersectionObserver(function(entries) {
+  entries.forEach(function(e) {
+    if (e.isIntersecting && !e.target.dataset.animated) {
+      e.target.dataset.animated = '1';
+      metricTargets.forEach(function(t) {
+        animateCounter(document.getElementById(t.id), t.val);
+      });
+    }
+  });
+}, { threshold: 0.3 });
+document.querySelectorAll('.metric-dash-card').forEach(function(el) { counterObserver.observe(el); });
+
+/* Fade-in on scroll */
+var fadeObserver = new IntersectionObserver(function(entries) {
+  entries.forEach(function(e, i) {
+    if (e.isIntersecting) {
+      setTimeout(function() { e.target.classList.add('visible'); }, i * 80);
+      fadeObserver.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.1 });
+document.querySelectorAll('.fade-in').forEach(function(el) { fadeObserver.observe(el); });
+
+/* Image lightbox */
+document.querySelectorAll('.graph-img-wrap img').forEach(function(img) {
+  img.addEventListener('click', function() {
+    document.getElementById('modal-img-src').src = img.src;
+    new bootstrap.Modal(document.getElementById('imgModal')).show();
+  });
+});
+</script>
+{% endblock %}

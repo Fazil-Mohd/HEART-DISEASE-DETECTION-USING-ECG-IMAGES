@@ -21,6 +21,14 @@ urlpatterns = [
 
     # In urls.py, add this to urlpatterns:
     path('export-csv/', views.export_history_csv_view, name='export_history_csv_view'),
+    path('model-performance/', views.model_performance_view, name='model_performance'),
+
+    # Patient Management URLs
+    path('patients/', views.patient_list_view, name='patient_list'),
+    path('patients/new/', views.patient_create_view, name='patient_create'),
+    path('patients/<int:patient_id>/', views.patient_detail_view, name='patient_detail'),
+    path('patients/<int:patient_id>/edit/', views.patient_update_view, name='patient_update'),
+    path('patients/<int:patient_id>/delete/', views.patient_delete_view, name='patient_delete'),
 
     # API URLs (User actions only)
     path('api/train/', views.api_train_model, name='api_train'),

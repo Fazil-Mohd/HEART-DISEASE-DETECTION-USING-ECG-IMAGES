@@ -99,6 +99,19 @@
                             {% endif %}
                         </div>
                         
+                        <div class="mb-4 p-3 bg-light rounded border border-primary border-opacity-25">
+                            <label for="{{ form.role.id_for_label }}" class="form-label fw-bold text-primary"><i class="fas fa-user-md me-2"></i>Account Type</label>
+                            {{ form.role }}
+                            <div class="form-text"><i class="fas fa-info-circle me-1"></i>Choose whether you are a normal user or a clinic managing patients.</div>
+                            {% if form.role.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.role.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
                         <div class="d-grid gap-2 mb-3">
                             <button type="submit" class="btn btn-primary btn-lg">
                                 <i class="fas fa-user-plus me-2"></i> Create Account

@@ -3,41 +3,36 @@
 #  Install with:  pip install -r requirements.txt
 # ──────────────────────────────────────────────────────────────
 
-# Deep Learning
+# ── Deep Learning ──────────────────────────────────────────────
 tensorflow==2.20.0
-keras==3.12.1
+keras==3.12.1                # bundled with tensorflow; explicit pin for clarity
+h5py==3.15.1
 
-# ML / Data Science
-scikit-learn==1.7.2
-scipy==1.15.3
-numpy==2.2.6
+# ── ML / Data Science ─────────────────────────────────────────
+scikit-learn==1.7.2          # compute_class_weight in ml_model.train_model()
+numpy==2.2.6                 # array ops in ml_model.py, utils.py, tasks.py
 pandas==2.3.3
+scipy==1.15.3
 
-# Explainability (LIME)
-lime==0.2.0.1
-scikit-image>=0.19
+# ── Explainability (LIME) ──────────────────────────────────────
+lime==0.2.0.1                # LimeImageExplainer in ml_model.generate_lime_explanation()
+scikit-image==0.25.2         # skimage.segmentation.mark_boundaries used by LIME
 
-# Image Processing
-Pillow==12.1.1
-opencv-python==4.13.0.92
+# ── Image Processing & Visualisation ──────────────────────────
+Pillow==12.1.1               # PIL.Image in utils.py and tasks.py
+matplotlib==3.10.8           # result image overlay + LIME plot (Agg backend)
+opencv-python==4.13.0.92     # Image processing utilities
 
-# Visualisation
-matplotlib==3.10.8
-seaborn==0.13.2
-
-# Web Framework (Django app)
+# ── Web Framework ──────────────────────────────────────────────
 Django==5.2.11
 asgiref==3.11.1
 sqlparse==0.5.5
 
-# HTTP / Utilities
-requests==2.32.5
-urllib3==2.6.3
+# ── Task Queue ─────────────────────────────────────────────────
+celery==5.6.2
+redis==7.3.0                 # Python Redis client used as broker & result backend
+kombu==5.6.2
 
-# TensorBoard (optional — for monitoring training)
-tensorboard==2.20.0
-
-# Task Queue & PDF Generation
-celery==5.3.6
-redis==5.0.1
-weasyprint==61.0
+# ── PDF Generation ─────────────────────────────────────────────
+xhtml2pdf==0.2.17            # pisa.CreatePDF in utils.generate_pdf_report_content()
+reportlab==4.4.10

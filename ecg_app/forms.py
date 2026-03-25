@@ -2,7 +2,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
-from .models import ECGRecord
+from .models import ECGRecord, Patient, UserProfile
 
 class UserRegisterForm(UserCreationForm):
     email = forms.EmailField(
@@ -29,6 +29,16 @@ class UserRegisterForm(UserCreationForm):
         })
     )
     
+    role = forms.ChoiceField(
+        choices=UserProfile.ROLE_CHOICES,
+        required=True,
+        initial='user',
+        label='Account Type',
+        widget=forms.Select(attrs={
+            'class': 'form-select mb-3'
+        })
+    )
+    
     class Meta:
         model = User
         fields = ['username', 'email', 'first_name', 'last_name', 'password1', 'password2']
@@ -44,6 +54,18 @@ class UserRegisterForm(UserCreationForm):
         super().__init__(*args, **kwargs)
         self.fields['password1'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Enter password'})
         self.fields['password2'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Confirm password'})
+
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError("A user with that username already exists.")
+        return username
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError("A user with that email already exists.")
+        return email
 
 class UserLoginForm(AuthenticationForm):
     username = forms.CharField(
@@ -78,11 +100,27 @@ class UserUpdateForm(forms.ModelForm):
             'username': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
+class PatientForm(forms.ModelForm):
+    class Meta:
+        model = Patient
+        fields = ['name', 'email', 'age', 'gender', 'contact_number', 'medical_history']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Full Name'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email Address (Optional)'}),
+            'age': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Age'}),
+            'gender': forms.Select(attrs={'class': 'form-control'}),
+            'contact_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Phone Number (Optional)'}),
+            'medical_history': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Prior conditions, medications (Optional)...'}),
+        }
+
 class ECGUploadForm(forms.ModelForm):
     class Meta:
         model = ECGRecord
-        fields = ['image', 'notes']  # CORRECT: 'image' is the field name in your model
+        fields = ['patient', 'image', 'notes']
         widgets = {
+            'patient': forms.Select(attrs={
+                'class': 'form-control',
+            }),
             'image': forms.FileInput(attrs={
                 'class': 'form-control',
                 'accept': 'image/*,.pdf',
@@ -95,6 +133,22 @@ class ECGUploadForm(forms.ModelForm):
             }),
         }
     
+    def __init__(self, *args, **kwargs):
+        # We need to filter patients by the current user
+        # We will pass the user to the form init in views.py
+        user = kwargs.pop('user', None)
+        super(ECGUploadForm, self).__init__(*args, **kwargs)
+        
+        # Make patient optional
+        self.fields['patient'].required = False
+        self.fields['patient'].empty_label = "--- Select Patient (Optional) ---"
+        
+        if user:
+            if hasattr(user, 'profile') and user.profile.role == 'clinic':
+                self.fields['patient'].queryset = Patient.objects.filter(user=user)
+            else:
+                self.fields['patient'].widget = forms.HiddenInput()
+
     def clean_image(self):
         image = self.cleaned_data.get('image')
         if image:

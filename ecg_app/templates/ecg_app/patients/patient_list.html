@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block title %}Patients - CardioVision AI{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h2>My Patients</h2>
+        <p class="text-muted">Manage your patient roster and their associated ECG scans.</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{% url 'patient_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus-circle me-1"></i> Add New Patient
+        </a>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        {% if patients %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Age / Gender</th>
+                            <th>Contact</th>
+                            <th>Total ECGs</th>
+                            <th>Added On</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for patient in patients %}
+                        <tr>
+                            <td>
+                                <strong>{{ patient.name }}</strong>
+                            </td>
+                            <td>{{ patient.age }} y/o {{ patient.get_gender_display }}</td>
+                            <td>{{ patient.contact_number|default:"-" }}</td>
+                            <td>
+                                <span class="badge bg-info text-dark">{{ patient.ecg_records.count }}</span>
+                            </td>
+                            <td>{{ patient.created_at|date:"M d, Y" }}</td>
+                            <td>
+                                <a href="{% url 'patient_detail' patient.id %}" class="btn btn-sm btn-outline-primary" title="View Patient Details">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <div class="mb-3 text-muted">
+                    <i class="fas fa-user-injured fa-3x"></i>
+                </div>
+                <h4>No patients yet</h4>
+                <p class="text-muted">You haven't added any patients to the system. Start by creating a patient profile.</p>
+                <a href="{% url 'patient_create' %}" class="btn btn-primary mt-2">Add First Patient</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

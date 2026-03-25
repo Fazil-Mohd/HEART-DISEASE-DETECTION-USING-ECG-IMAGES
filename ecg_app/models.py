@@ -2,8 +2,36 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 
+class Patient(models.Model):
+    GENDER_CHOICES = [
+        ('M', 'Male'),
+        ('F', 'Female'),
+        ('O', 'Other'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='patients')
+    name = models.CharField(max_length=100)
+    email = models.EmailField(blank=True, help_text="Optional: Email address to send reports to.")
+    age = models.PositiveIntegerField()
+    gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
+    medical_history = models.TextField(blank=True, help_text="Any known prior heart conditions, medications, etc.")
+    contact_number = models.CharField(max_length=20, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.name} ({self.age}{self.gender})"
+    
+    class Meta:
+        ordering = ['-created_at']
+
 class UserProfile(models.Model):
+    ROLE_CHOICES = [
+        ('user', 'Normal User'),
+        ('clinic', 'Clinic / Organization'),
+    ]
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user')
     phone = models.CharField(max_length=20, blank=True)
     address = models.TextField(blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
@@ -11,7 +39,7 @@ class UserProfile(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
-        return f"{self.user.username}'s Profile"
+        return f"{self.user.username}'s Profile ({self.get_role_display()})"
 
 class ECGRecord(models.Model):
     CATEGORY_CHOICES = [
@@ -29,6 +57,7 @@ class ECGRecord(models.Model):
     ]
     
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ecg_records')
+    patient = models.ForeignKey(Patient, on_delete=models.SET_NULL, null=True, blank=True, related_name='ecg_records', help_text="Optional: Link this ECG to a specific patient")
     image = models.ImageField(upload_to='uploaded_ecgs/%Y/%m/%d/')
     predicted_category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     confidence = models.FloatField(null=True, blank=True, default=None)

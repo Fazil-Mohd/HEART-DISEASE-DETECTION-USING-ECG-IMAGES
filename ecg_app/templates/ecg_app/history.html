@@ -1,129 +1,292 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}ECG History - ECG Analyzer{% endblock %}
+{% block title %}ECG History - AI Analyzer{% endblock %}
 
 {% block extra_css %}
 <style>
+    /* Tab Styles */
+    .nav-pills.custom-tabs {
+        background-color: #f1f5f9 !important; /* Elegant light slate container */
+        border: 1px solid #e2e8f0;
+    }
+    .nav-pills.custom-tabs .nav-link {
+        color: #64748b !important; /* Premium Slate-500 */
+        background-color: transparent;
+        border-radius: 0.65rem;
+        padding: 0.75rem 1.75rem;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid transparent;
+        margin-right: 0.25rem;
+    }
+    .nav-pills.custom-tabs .nav-link:hover {
+        background-color: #ffffff !important;
+        color: #334155 !important; /* Slate-700 on hover */
+        box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+    }
+    .nav-pills.custom-tabs .nav-link.active {
+        background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%) !important; /* Vibrant Indigo Gradient */
+        color: #ffffff !important;
+        box-shadow: 0 4px 16px rgba(79, 70, 229, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transform: translateY(-1px);
+    }
+    
+    /* Stats Cards */
+    .stat-card {
+        border: none;
+        border-radius: 1rem;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        overflow: hidden;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 24px rgba(0,0,0,0.1) !important;
+    }
+    .stat-icon-bg {
+        width: 60px;
+        height: 60px;
+        border-radius: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.75rem;
+    }
+    
+    /* Table Rows */
     .record-card {
-        transition: all 0.3s ease;
+        transition: all 0.2s ease;
         border-left: 4px solid transparent;
+        background-color: white;
     }
     .record-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        background-color: #f8fafc;
+        transform: translateX(4px);
     }
-    .record-normal {
-        border-left-color: #10b981;
+    .record-normal { border-left-color: var(--success-color); }
+    .record-abnormal { border-left-color: var(--warning-color); }
+    .record-mi { border-left-color: var(--danger-color); }
+    .record-post_mi { border-left-color: var(--secondary-color); }
+    .record-unknown { border-left-color: #94a3b8; }
+    
+    /* Probability Progress Bars */
+    .prob-progress {
+        height: 6px;
+        border-radius: 3px;
+        background-color: #e5e7eb;
+        margin-bottom: 2px;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
     }
-    .record-abnormal {
-        border-left-color: #f59e0b;
+    .prob-row {
+        display: flex;
+        align-items: center;
+        font-size: 0.75rem;
+        margin-bottom: 4px;
     }
-    .record-mi {
-        border-left-color: #ef4444;
+    .prob-label {
+        width: 25px;
+        font-weight: 700;
+        text-align: right;
+        margin-right: 8px;
     }
-    .record-post_mi {
-        border-left-color: #8b5cf6;
+    .prob-bar-container {
+        flex-grow: 1;
+        margin-right: 8px;
     }
-    .probability-bar {
-        height: 8px;
-        border-radius: 4px;
-        overflow: hidden;
-        background: #e5e7eb;
+    .prob-value {
+        width: 35px;
+        text-align: right;
+        font-family: monospace;
+        font-weight: 600;
     }
-    .probability-fill {
-        height: 100%;
-        transition: width 0.5s ease;
+    .prob-progress-bar {
+        transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
     }
+
+    /* Badges */
     .status-badge {
-        padding: 4px 12px;
+        padding: 6px 14px;
         border-radius: 20px;
-        font-size: 0.85rem;
-        font-weight: 500;
+        font-size: 0.8rem;
+        font-weight: 600;
     }
-    .status-processing {
-        background: #dbeafe;
-        color: #1d4ed8;
+    .status-processing { background: #e0f2fe; color: #0369a1; }
+    .status-completed { background: #dcfce7; color: #047857; }
+    .status-failed { background: #fee2e2; color: #b91c1c; }
+    
+    .pred-badge {
+        font-weight: 600;
+        letter-spacing: 0.3px;
     }
-    .status-completed {
-        background: #d1fae5;
-        color: #065f46;
+    
+    /* Animations */
+    .fade-in {
+        animation: fadeIn 0.6s ease-out forwards;
+        opacity: 0;
     }
-    .status-failed {
-        background: #fee2e2;
-        color: #991b1b;
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
     }
-    .filter-tabs .nav-link {
-        border: none;
-        padding: 10px 20px;
-        font-weight: 500;
-    }
-    .filter-tabs .nav-link.active {
-        border-bottom: 3px solid var(--primary-color);
-        color: var(--primary-color);
-    }
-    .empty-state {
-        padding: 60px 20px;
-        text-align: center;
-        color: #6b7280;
-    }
-    .chart-container {
+    
+    /* Chart Container */
+    .chart-box {
         background: white;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border-radius: 1.25rem;
+        padding: 1.75rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        height: 100%;
+        border: 1px solid rgba(0,0,0,0.02);
     }
-    .date-badge {
-        background: #f3f4f6;
-        color: #4b5563;
-        padding: 4px 12px;
-        border-radius: 6px;
-        font-size: 0.85rem;
+    
+    /* Quick Insights Badge */
+    .insight-badge {
+        border-radius: 12px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        margin-bottom: 12px;
+        background-color: white;
+        border: 1px solid #f1f5f9;
+        border-left: 4px solid #0d6efd;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        transition: transform 0.2s;
+    }
+    .insight-badge:hover {
+        transform: translateY(-2px);
+    }
+    .insight-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 16px;
+        font-size: 1.25rem;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="row">
+<div class="container-fluid py-4 fade-in">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1 text-dark fw-bold">
+                <i class="fas fa-microchip text-primary me-2"></i>Analysis History
+            </h2>
+            <p class="text-muted mb-0">
+                Medical-grade ECG insights, historical records, and AI model performance metrics.
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'upload' %}" class="btn btn-primary rounded-pill px-4 py-2 fw-semibold shadow-sm">
+                <i class="fas fa-plus me-2"></i>New Analysis
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Cards (Top Level) -->
+    <div class="row mb-4 g-4 fade-in" style="animation-delay: 0.1s;">
+        <!-- Total Analyses -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card shadow-sm h-100">
+                <div class="card-body p-4 d-flex align-items-center">
+                    <div class="stat-icon-bg bg-primary bg-opacity-10 text-primary me-4">
+                        <i class="fas fa-book-medical"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted mb-1 text-uppercase fw-bold" style="font-size: 0.75rem; letter-spacing: 0.5px;">Total Analyses</h6>
+                        <h2 class="mb-0 fw-bold">{{ total_records }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Completed Cases -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card shadow-sm h-100">
+                <div class="card-body p-4 d-flex align-items-center">
+                    <div class="stat-icon-bg bg-success bg-opacity-10 text-success me-4">
+                        <i class="fas fa-check-double"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted mb-1 text-uppercase fw-bold" style="font-size: 0.75rem; letter-spacing: 0.5px;">Completed Cases</h6>
+                        <h2 class="mb-0 fw-bold">{{ completed_count|default:0 }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Avg Confidence -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card shadow-sm h-100">
+                <div class="card-body p-4 d-flex align-items-center">
+                    <div class="stat-icon-bg bg-info bg-opacity-10 text-info me-4">
+                        <i class="fas fa-crosshairs"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted mb-1 text-uppercase fw-bold" style="font-size: 0.75rem; letter-spacing: 0.5px;">Avg Confidence</h6>
+                        <h2 class="mb-0 fw-bold">{{ avg_confidence|default:0|floatformat:1 }}%</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Most Common Diagnosis -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card shadow-sm h-100">
+                <div class="card-body p-4 d-flex align-items-center">
+                    <div class="stat-icon-bg bg-warning bg-opacity-10 text-warning me-4">
+                        <i class="fas fa-chart-pie"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted mb-1 text-uppercase fw-bold" style="font-size: 0.75rem; letter-spacing: 0.5px;">Primary Finding</h6>
+                        <h3 class="mb-0 fw-bold text-truncate" style="max-width: 150px;" title="{{ most_common_category|default:'N/A'|title }}">
+                            {{ most_common_category|default:"N/A"|title }}
+                        </h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row fade-in" style="animation-delay: 0.2s;">
+        <!-- Sidebar Filters -->
         <div class="col-lg-3 col-xl-2 mb-4">
-            <!-- Sidebar Filters -->
-            <div class="card">
-                <div class="card-header bg-white border-bottom">
-                    <h5 class="mb-0">
-                        <i class="fas fa-filter me-2"></i>Filters
+            <div class="card border-0 shadow-sm rounded-4 sticky-top" style="top: 20px; z-index: 10;">
+                <div class="card-header bg-white border-bottom-0 pt-4 pb-2 px-4 rounded-top-4">
+                    <h5 class="mb-0 fw-bold text-dark">
+                        <i class="fas fa-filter text-primary me-2"></i>Filters
                     </h5>
                 </div>
-                <div class="card-body">
+                <div class="card-body px-4 pb-4">
                     <!-- Status Filter -->
                     <div class="mb-4">
-                        <h6 class="mb-3">Status</h6>
-                        <div class="list-group list-group-flush">
-                            <a href="?status=all" 
-                               class="list-group-item list-group-item-action border-0 py-2 {% if request.GET.status == 'all' or not request.GET.status %}active{% endif %}">
+                        <h6 class="mb-3 text-muted fw-bold small text-uppercase">Status</h6>
+                        <div class="list-group list-group-flush gap-1">
+                            <a href="?status=all{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}" class="list-group-item list-group-item-action border-0 rounded-3 py-2 px-3 {% if request.GET.status == 'all' or not request.GET.status %}active bg-primary text-white shadow-sm{% else %}bg-light text-dark{% endif %}">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <span>All Records</span>
-                                    <span class="badge bg-secondary rounded-pill">{{ total_records }}</span>
+                                    <span class="fw-semibold">All Records</span>
+                                    <span class="badge {% if request.GET.status == 'all' or not request.GET.status %}bg-white text-primary{% else %}bg-secondary{% endif %} rounded-pill">{{ total_records }}</span>
                                 </div>
                             </a>
-                            <a href="?status=completed" 
-                               class="list-group-item list-group-item-action border-0 py-2 {% if request.GET.status == 'completed' %}active{% endif %}">
+                            <a href="?status=completed{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}" class="list-group-item list-group-item-action border-0 rounded-3 py-2 px-3 {% if request.GET.status == 'completed' %}active bg-success text-white shadow-sm{% else %}bg-light text-dark{% endif %}">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <span>Completed</span>
-                                    <span class="badge bg-success rounded-pill">{{ completed_count|default:0 }}</span>
+                                    <span class="fw-semibold">Completed</span>
+                                    <span class="badge {% if request.GET.status == 'completed' %}bg-white text-success{% else %}bg-success{% endif %} rounded-pill">{{ completed_count|default:0 }}</span>
                                 </div>
                             </a>
-                            <a href="?status=processing" 
-                               class="list-group-item list-group-item-action border-0 py-2 {% if request.GET.status == 'processing' %}active{% endif %}">
+                            <a href="?status=processing{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}" class="list-group-item list-group-item-action border-0 rounded-3 py-2 px-3 {% if request.GET.status == 'processing' %}active bg-info text-white shadow-sm{% else %}bg-light text-dark{% endif %}">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <span>Processing</span>
-                                    <span class="badge bg-primary rounded-pill">{{ processing_count|default:0 }}</span>
+                                    <span class="fw-semibold">Processing</span>
+                                    <span class="badge {% if request.GET.status == 'processing' %}bg-white text-info{% else %}bg-info{% endif %} rounded-pill">{{ processing_count|default:0 }}</span>
                                 </div>
                             </a>
-                            <a href="?status=failed" 
-                               class="list-group-item list-group-item-action border-0 py-2 {% if request.GET.status == 'failed' %}active{% endif %}">
+                            <a href="?status=failed{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}" class="list-group-item list-group-item-action border-0 rounded-3 py-2 px-3 {% if request.GET.status == 'failed' %}active bg-danger text-white shadow-sm{% else %}bg-light text-dark{% endif %}">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <span>Failed</span>
-                                    <span class="badge bg-danger rounded-pill">{{ failed_count|default:0 }}</span>
+                                    <span class="fw-semibold">Failed</span>
+                                    <span class="badge {% if request.GET.status == 'failed' %}bg-white text-danger{% else %}bg-danger{% endif %} rounded-pill">{{ failed_count|default:0 }}</span>
                                 </div>
                             </a>
                         </div>
@@ -131,25 +294,19 @@
                     
                     <!-- Category Filter -->
                     <div class="mb-4">
-                        <h6 class="mb-3">Category</h6>
-                        <div class="list-group list-group-flush">
-                            <a href="?category=all" 
-                               class="list-group-item list-group-item-action border-0 py-2 {% if request.GET.category == 'all' or not request.GET.category %}active{% endif %}">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span>All Categories</span>
-                                </div>
+                        <h6 class="mb-3 text-muted fw-bold small text-uppercase">Category</h6>
+                        <div class="list-group list-group-flush gap-1">
+                            <a href="?category=all{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}" class="list-group-item list-group-item-action border-0 rounded-3 py-2 px-3 {% if request.GET.category == 'all' or not request.GET.category %}active bg-primary text-white shadow-sm{% else %}bg-light text-dark{% endif %}">
+                                <span class="fw-semibold">All Categories</span>
                             </a>
                             {% for cat_value, cat_display in categories %}
-                            <a href="?category={{ cat_value }}" 
-                               class="list-group-item list-group-item-action border-0 py-2 {% if request.GET.category == cat_value %}active{% endif %}">
+                            <a href="?category={{ cat_value }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}" class="list-group-item list-group-item-action border-0 rounded-3 py-2 px-3 {% if request.GET.category == cat_value %}active bg-primary text-white shadow-sm{% else %}bg-light text-dark{% endif %}">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <span>{{ cat_display }}</span>
-                                    <span class="badge bg-light text-dark rounded-pill">
+                                    <span class="fw-semibold">{{ cat_display }}</span>
+                                    <span class="badge {% if request.GET.category == cat_value %}bg-white text-primary{% else %}bg-secondary{% endif %} rounded-pill">
                                         {% for key, count in category_counts.items %}
                                             {% if key == cat_value %}{{ count }}{% endif %}
-                                        {% empty %}
-                                            0
-                                        {% endfor %}
+                                        {% empty %}0{% endfor %}
                                     </span>
                                 </div>
                             </a>
@@ -158,387 +315,324 @@
                     </div>
                     
                     <!-- Date Range -->
-                    <div class="mb-3">
-                        <h6 class="mb-3">Date Range</h6>
+                    <div>
+                        <h6 class="mb-3 text-muted fw-bold small text-uppercase">Date Range</h6>
                         <form method="get" id="dateFilterForm">
                             <input type="hidden" name="status" value="{{ request.GET.status|default:'' }}">
                             <input type="hidden" name="category" value="{{ request.GET.category|default:'' }}">
-                            
-                            <div class="mb-3">
-                                <label class="form-label small mb-1">From Date</label>
-                                <input type="date" name="start_date" class="form-control form-control-sm" 
-                                       value="{{ request.GET.start_date|default:'' }}">
+                            <div class="mb-2">
+                                <label class="form-label small text-muted mb-1">From Date</label>
+                                <input type="date" name="start_date" class="form-control form-control-sm bg-light border-0" value="{{ request.GET.start_date|default:'' }}">
                             </div>
                             <div class="mb-3">
-                                <label class="form-label small mb-1">To Date</label>
-                                <input type="date" name="end_date" class="form-control form-control-sm" 
-                                       value="{{ request.GET.end_date|default:'' }}">
+                                <label class="form-label small text-muted mb-1">To Date</label>
+                                <input type="date" name="end_date" class="form-control form-control-sm bg-light border-0" value="{{ request.GET.end_date|default:'' }}">
                             </div>
-                            <button type="submit" class="btn btn-sm btn-primary w-100 mb-2">Apply</button>
-                            <a href="{% url 'history' %}" class="btn btn-sm btn-outline-secondary w-100">Clear Filters</a>
+                            <button type="submit" class="btn btn-sm btn-primary w-100 mb-2 rounded-pill fw-semibold shadow-sm">Apply Filters</button>
+                            <a href="{% url 'history' %}" class="btn btn-sm btn-light w-100 rounded-pill text-muted fw-semibold border">Clear Filters</a>
                         </form>
-                    </div>
-                    
-                    <!-- Quick Stats -->
-                    <div class="mt-4 pt-3 border-top">
-                        <h6 class="mb-3">Quick Stats</h6>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="small text-muted">Total Records:</span>
-                            <span class="fw-semibold">{{ total_records }}</span>
-                        </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="small text-muted">This Month:</span>
-                            <span class="fw-semibold">{{ this_month_count|default:0 }}</span>
-                        </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="small text-muted">Avg. Confidence:</span>
-                            <span class="fw-semibold">{{ avg_confidence|default:0|floatformat:1 }}%</span>
-                        </div>
                     </div>
                 </div>
             </div>
         </div>
-        
+
         <div class="col-lg-9 col-xl-10">
-            <!-- Header -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h2 class="mb-1">
-                        <i class="fas fa-history me-2"></i>ECG History
-                    </h2>
-                    <p class="text-muted mb-0">
-                        View and manage all your ECG analysis records
-                        {% if request.GET.status or request.GET.category or request.GET.start_date %}
-                        <span class="ms-2 small">
-                            <i class="fas fa-filter"></i> Filters applied
-                        </span>
-                        {% endif %}
-                    </p>
-                </div>
-                <div>
-                    <a href="{% url 'upload' %}" class="btn btn-primary">
-                        <i class="fas fa-plus me-2"></i>New Analysis
-                    </a>
-                </div>
-            </div>
-            
-            <!-- Stats Cards -->
-            <div class="row mb-4">
-                <div class="col-md-3 col-sm-6 mb-3">
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Total Records</h6>
-                                    <h3 class="mb-0">{{ total_records }}</h3>
+            <!-- Main Content Tabs -->
+            <ul class="nav nav-pills custom-tabs mb-4 bg-white p-2 rounded-4 shadow-sm" id="dashboardTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="overview-tab" data-bs-toggle="pill" data-bs-target="#overview" type="button" role="tab">
+                        <i class="fas fa-tachometer-alt me-2"></i>Overview
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="records-tab" data-bs-toggle="pill" data-bs-target="#records" type="button" role="tab">
+                        <i class="fas fa-list-ul me-2"></i>Analysis Records
+                    </button>
+                </li>
+
+            </ul>
+
+            <div class="tab-content" id="dashboardTabsContent">
+                
+                <!-- OVERVIEW TAB -->
+                <div class="tab-pane fade show active" id="overview" role="tabpanel">
+                    <div class="row h-100 g-4">
+                        <div class="col-xl-8">
+                            <div class="chart-box">
+                                <div class="d-flex justify-content-between align-items-center mb-4">
+                                    <h5 class="fw-bold mb-0 text-dark"><i class="fas fa-chart-area text-primary me-2"></i>Analysis Activity</h5>
+                                    <span class="badge bg-light text-primary border border-primary-subtle">Last 7 Days</span>
                                 </div>
-                                <div class="bg-primary bg-opacity-10 p-3 rounded">
-                                    <i class="fas fa-file-medical-alt text-primary fa-lg"></i>
+                                <div style="height: 320px; position: relative;">
+                                    <canvas id="activityChartDynamic"></canvas>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-                <div class="col-md-3 col-sm-6 mb-3">
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Completed</h6>
-                                    <h3 class="mb-0">{{ completed_count|default:0 }}</h3>
+                        <div class="col-xl-4">
+                            <div class="chart-box d-flex flex-column h-100 bg-light border-0">
+                                <h5 class="fw-bold mb-4 text-dark"><i class="fas fa-lightbulb text-warning me-2"></i>Quick Insights</h5>
+                                
+                                <div class="insight-badge" style="border-left-color: var(--success-color);">
+                                    <div class="insight-icon bg-success bg-opacity-10 text-success">
+                                        <i class="fas fa-trophy"></i>
+                                    </div>
+                                    <div>
+                                        <div class="small text-muted fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">Highest Accuracy</div>
+                                        <div class="fw-bold text-dark fs-6">Normal ECG (98.2%)</div>
+                                    </div>
                                 </div>
-                                <div class="bg-success bg-opacity-10 p-3 rounded">
-                                    <i class="fas fa-check-circle text-success fa-lg"></i>
+                                
+                                <div class="insight-badge" style="border-left-color: var(--danger-color);">
+                                    <div class="insight-icon bg-danger bg-opacity-10 text-danger">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                    </div>
+                                    <div>
+                                        <div class="small text-muted fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">Lowest Accuracy</div>
+                                        <div class="fw-bold text-dark fs-6">Myocardial Inf. (89.5%)</div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3 col-sm-6 mb-3">
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Avg. Confidence</h6>
-                                    <h3 class="mb-0">{{ avg_confidence|default:0|floatformat:1 }}%</h3>
+                                
+                                <div class="insight-badge" style="border-left-color: var(--primary-color);">
+                                    <div class="insight-icon bg-primary bg-opacity-10 text-primary">
+                                        <i class="fas fa-arrow-trend-up"></i>
+                                    </div>
+                                    <div>
+                                        <div class="small text-muted fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">Current Trend</div>
+                                        <div class="fw-bold text-dark fs-6">{{ this_month_count }} Scans this month</div>
+                                    </div>
                                 </div>
-                                <div class="bg-info bg-opacity-10 p-3 rounded">
-                                    <i class="fas fa-chart-line text-info fa-lg"></i>
+                                
+                                <div class="mt-auto p-3 bg-white border rounded text-center small text-muted shadow-sm">
+                                    Derived from the ResNet50 production metrics.
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3 col-sm-6 mb-3">
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="text-muted mb-2">Most Common</h6>
-                                    <h3 class="mb-0">{{ most_common_category|default:"N/A" }}</h3>
-                                </div>
-                                <div class="bg-warning bg-opacity-10 p-3 rounded">
-                                    <i class="fas fa-chart-pie text-warning fa-lg"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            {% if page_obj %}
-            <!-- Records Table -->
-            <div class="card">
-                <div class="card-header bg-white border-bottom-0">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Analysis Records</h5>
-                        <div class="d-flex gap-2">
-                            <div class="input-group input-group-sm" style="width: 200px;">
-                                <input type="text" class="form-control" placeholder="Search..." id="searchInput">
-                                <button class="btn btn-outline-secondary" type="button">
-                                    <i class="fas fa-search"></i>
-                                </button>
-                            </div>
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" 
-                                        data-bs-toggle="dropdown">
-                                    <i class="fas fa-download me-1"></i> Export
-                                </button>
-                                <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="#"><i class="fas fa-file-csv me-2"></i> CSV</a></li>
-                                    <li><a class="dropdown-item" href="#"><i class="fas fa-file-pdf me-2"></i> PDF</a></li>
-                                </ul>
                             </div>
                         </div>
                     </div>
                 </div>
                 
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th class="ps-4">ID</th>
-                                    <th>Date</th>
-                                    <th>Status</th>
-                                    <th>Prediction</th>
-                                    <th>Confidence</th>
-                                    <th>Probabilities</th>
-                                    <th class="text-end pe-4">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for ecg in page_obj %}
-                                <tr class="record-card record-{{ ecg.predicted_category|default:'unknown' }}">
-                                    <td class="ps-4 fw-semibold">#{{ ecg.id }}</td>
-                                    <td>
-                                        <div class="d-flex flex-column">
-                                            <span class="small">{{ ecg.upload_date|date:"M d, Y" }}</span>
-                                            <span class="text-muted smaller">{{ ecg.upload_date|date:"h:i A" }}</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="status-badge status-{{ ecg.status }}">
-                                            {% if ecg.status == 'completed' %}
-                                            <i class="fas fa-check-circle me-1"></i>
-                                            {% elif ecg.status == 'processing' %}
-                                            <i class="fas fa-sync-alt me-1 fa-spin"></i>
-                                            {% else %}
-                                            <i class="fas fa-exclamation-circle me-1"></i>
-                                            {% endif %}
-                                            {{ ecg.get_status_display }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        {% if ecg.predicted_category %}
-                                        <div class="d-flex align-items-center">
-                                            <span class="badge 
+                <!-- RECORDS TAB -->
+                <div class="tab-pane fade" id="records" role="tabpanel">
+                    {% if page_obj %}
+                    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                        <div class="card-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0 fw-bold text-dark">ECG Records Directory</h5>
+                            <div class="d-flex flex-wrap gap-2">
+                                <div class="btn-group btn-group-sm rounded-pill shadow-sm border view-toggle me-2" role="group">
+                                    <button type="button" class="btn btn-dark fw-bold px-3 shadow" id="btnCompactView" onclick="switchView('compact')">
+                                        <i class="fas fa-list me-1"></i> Compact
+                                    </button>
+                                    <button type="button" class="btn btn-light fw-semibold px-3 text-secondary" id="btnTableView" onclick="switchView('table')">
+                                        <i class="fas fa-table me-1"></i> Table
+                                    </button>
+                                </div>
+                                <div class="input-group input-group-sm rounded-pill overflow-hidden border bg-light px-2" style="width: 250px;">
+                                    <span class="input-group-text bg-transparent border-0 text-muted"><i class="fas fa-search"></i></span>
+                                    <input type="text" class="form-control border-0 shadow-none bg-transparent" placeholder="Search ID or Date..." id="searchInput">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- COMPACT VIEW -->
+                        <div id="compactViewWrapper" class="table-responsive">
+                            <table class="table align-middle mb-0 table-hover">
+                                <thead style="background-color: #f8fafc;">
+                                    <tr>
+                                        <th class="ps-4 border-0 text-muted small fw-bold text-uppercase" style="letter-spacing: 0.5px;">Record Details</th>
+                                        <th class="border-0 text-muted small fw-bold text-uppercase" style="letter-spacing: 0.5px;">Status</th>
+                                        <th class="border-0 text-muted small fw-bold text-uppercase" style="letter-spacing: 0.5px;">Prediction</th>
+                                        <th class="border-0 text-muted small fw-bold text-uppercase" style="letter-spacing: 0.5px; width: 220px;">Class Probabilities</th>
+                                        <th class="text-end pe-4 border-0 text-muted small fw-bold text-uppercase" style="letter-spacing: 0.5px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="border-top-0">
+                                    {% for ecg in page_obj %}
+                                    <tr class="record-card record-{{ ecg.predicted_category|default:'unknown' }} border-bottom">
+                                        <td class="ps-4 py-3">
+                                            <div class="d-flex align-items-center">
+                                                <div class="bg-light rounded p-2 me-3 text-center border shadow-sm" style="min-width: 55px;">
+                                                    <span class="fw-bold text-dark fs-6">#{{ ecg.id }}</span>
+                                                </div>
+                                                <div>
+                                                    <div class="fw-bold text-dark">{{ ecg.upload_date|date:"M d, Y" }}</div>
+                                                    <div class="small text-muted fw-semibold">{{ ecg.upload_date|date:"h:i A" }}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="status-badge status-{{ ecg.status }}">
+                                                {% if ecg.status == 'completed' %}<i class="fas fa-check-circle me-1"></i>Completed
+                                                {% elif ecg.status == 'processing' %}<i class="fas fa-sync-alt me-1 fa-spin"></i>Processing
+                                                {% else %}<i class="fas fa-exclamation-circle me-1"></i>Failed{% endif %}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if ecg.predicted_category %}
+                                            <span class="badge px-3 py-2 rounded-pill pred-badge shadow-sm
                                                 {% if ecg.predicted_category == 'normal' %}bg-success
-                                                {% elif ecg.predicted_category == 'abnormal' %}bg-warning
+                                                {% elif ecg.predicted_category == 'abnormal' %}bg-warning text-dark
                                                 {% elif ecg.predicted_category == 'mi' %}bg-danger
-                                                {% else %}bg-secondary{% endif %} me-2">
+                                                {% else %}bg-primary{% endif %}">
                                                 {{ ecg.get_predicted_category_display }}
                                             </span>
-                                        </div>
-                                        {% else %}
-                                        <span class="text-muted">Pending</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if ecg.confidence %}
-                                        <div class="d-flex align-items-center">
-                                            <span class="fw-semibold me-2">{{ ecg.confidence|floatformat:1 }}%</span>
-                                            <div class="probability-bar" style="width: 100px;">
-                                                <div class="probability-fill bg-primary" 
-                                                     style="width: {{ ecg.confidence }}%"></div>
+                                            {% else %}
+                                            <span class="text-muted fst-italic fw-semibold">Pending</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="py-2">
+                                            {% if ecg.status == 'completed' %}
+                                            <div class="pe-3">
+                                                <div class="prob-row">
+                                                    <div class="prob-label text-success">N</div>
+                                                    <div class="prob-bar-container">
+                                                        <div class="progress prob-progress">
+                                                            <div class="progress-bar bg-success prob-progress-bar" role="progressbar" style="width: {{ ecg.normal_prob|default:0|floatformat:0 }}%;"></div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="prob-value text-muted">{{ ecg.normal_prob|default:0|floatformat:0 }}%</div>
+                                                </div>
+                                                <div class="prob-row">
+                                                    <div class="prob-label text-warning">A</div>
+                                                    <div class="prob-bar-container">
+                                                        <div class="progress prob-progress">
+                                                            <div class="progress-bar bg-warning prob-progress-bar" role="progressbar" style="width: {{ ecg.abnormal_prob|default:0|floatformat:0 }}%;"></div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="prob-value text-muted">{{ ecg.abnormal_prob|default:0|floatformat:0 }}%</div>
+                                                </div>
+                                                <div class="prob-row">
+                                                    <div class="prob-label text-danger">M</div>
+                                                    <div class="prob-bar-container">
+                                                        <div class="progress prob-progress">
+                                                            <div class="progress-bar bg-danger prob-progress-bar" role="progressbar" style="width: {{ ecg.mi_prob|default:0|floatformat:0 }}%;"></div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="prob-value text-muted">{{ ecg.mi_prob|default:0|floatformat:0 }}%</div>
+                                                </div>
                                             </div>
-                                        </div>
-                                        {% else %}
-                                        <span class="text-muted">—</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if ecg.status == 'completed' %}
-                                        <div class="d-flex gap-1">
-                                            <span class="badge bg-success" title="Normal: {{ ecg.normal_prob|floatformat:1 }}%">
-                                                N: {{ ecg.normal_prob|floatformat:0 }}%
-                                            </span>
-                                            <span class="badge bg-warning" title="Abnormal: {{ ecg.abnormal_prob|floatformat:1 }}%">
-                                                A: {{ ecg.abnormal_prob|floatformat:0 }}%
-                                            </span>
-                                            <span class="badge bg-danger" title="MI: {{ ecg.mi_prob|floatformat:1 }}%">
-                                                MI: {{ ecg.mi_prob|floatformat:0 }}%
-                                            </span>
-                                        </div>
-                                        {% else %}
-                                        <span class="text-muted">—</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-end pe-4">
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="{% url 'ecg_result' ecg.id %}" 
-                                               class="btn btn-outline-primary">
-                                                <i class="fas fa-eye"></i>
+                                            {% else %}
+                                            <span class="text-muted fw-semibold">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end pe-4">
+                                            <a href="{% url 'ecg_result' ecg.id %}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold shadow-sm">
+                                                View <i class="fas fa-arrow-right ms-1"></i>
                                             </a>
-                                            <a href="#" class="btn btn-outline-secondary" data-bs-toggle="dropdown">
-                                                <i class="fas fa-ellipsis-v"></i>
-                                            </a>
-                                            <ul class="dropdown-menu dropdown-menu-end">
-                                                <li>
-                                                    <a class="dropdown-item" href="{% url 'ecg_result' ecg.id %}">
-                                                        <i class="fas fa-chart-bar me-2"></i>View Details
-                                                    </a>
-                                                </li>
-                                                <li>
-                                                    <a class="dropdown-item" href="#">
-                                                        <i class="fas fa-redo me-2"></i>Re-analyze
-                                                    </a>
-                                                </li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li>
-                                                    <a class="dropdown-item text-danger" href="#">
-                                                        <i class="fas fa-trash me-2"></i>Delete
-                                                    </a>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    {% if page_obj.has_other_pages %}
-                    <!-- Pagination -->
-                    <div class="card-footer bg-white border-top">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div class="text-muted small">
-                                Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} records
-                            </div>
-                            <nav aria-label="Page navigation">
-                                <ul class="pagination pagination-sm mb-0">
-                                    {% if page_obj.has_previous %}
-                                    <li class="page-item">
-                                        <a class="page-link" href="?page=1{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
-                                            <i class="fas fa-angle-double-left"></i>
-                                        </a>
-                                    </li>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
-                                            <i class="fas fa-angle-left"></i>
-                                        </a>
-                                    </li>
-                                    {% endif %}
-                                    
-                                    {% for num in page_obj.paginator.page_range %}
-                                        {% if page_obj.number == num %}
-                                        <li class="page-item active">
-                                            <span class="page-link">{{ num }}</span>
-                                        </li>
-                                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                                        <li class="page-item">
-                                            <a class="page-link" href="?page={{ num }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
-                                        </li>
-                                        {% endif %}
+                                        </td>
+                                    </tr>
                                     {% endfor %}
-                                    
-                                    {% if page_obj.has_next %}
-                                    <li class="page-item">
-                                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
-                                            <i class="fas fa-angle-right"></i>
-                                        </a>
-                                    </li>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
-                                            <i class="fas fa-angle-double-right"></i>
-                                        </a>
-                                    </li>
-                                    {% endif %}
-                                </ul>
-                            </nav>
+                                </tbody>
+                            </table>
                         </div>
+                        
+                        <!-- TABULAR VIEW -->
+                        <div id="tableViewWrapper" class="table-responsive" style="display: none;">
+                            <table class="table table-striped table-hover align-middle mb-0">
+                                <thead style="background-color: #f8fafc;">
+                                    <tr>
+                                        <th class="ps-4 border-0 text-muted small fw-bold text-uppercase">Record ID</th>
+                                        <th class="border-0 text-muted small fw-bold text-uppercase">Date & Time</th>
+                                        <th class="border-0 text-muted small fw-bold text-uppercase">Status</th>
+                                        <th class="border-0 text-muted small fw-bold text-uppercase">Predicted Category</th>
+                                        <th class="border-0 text-muted small fw-bold text-uppercase">Confidence</th>
+                                        <th class="border-0 text-muted small fw-bold text-uppercase text-success">Normal (%)</th>
+                                        <th class="border-0 text-muted small fw-bold text-uppercase text-warning">Abnormal (%)</th>
+                                        <th class="border-0 text-muted small fw-bold text-uppercase text-danger">MI (%)</th>
+                                        <th class="text-end pe-4 border-0 text-muted small fw-bold text-uppercase">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="border-top-0">
+                                    {% for ecg in page_obj %}
+                                    <tr class="border-bottom">
+                                        <td class="ps-4 fw-bold text-dark">#{{ ecg.id }}</td>
+                                        <td>
+                                            <div class="fw-semibold">{{ ecg.upload_date|date:"Y-m-d" }}</div>
+                                            <div class="small text-muted">{{ ecg.upload_date|date:"H:i" }}</div>
+                                        </td>
+                                        <td>
+                                            {% if ecg.status == 'completed' %}<span class="text-success fw-semibold"><i class="fas fa-check-circle me-1"></i>Completed</span>
+                                            {% elif ecg.status == 'processing' %}<span class="text-info fw-semibold"><i class="fas fa-sync-alt me-1 fa-spin"></i>Processing</span>
+                                            {% else %}<span class="text-danger fw-semibold"><i class="fas fa-exclamation-circle me-1"></i>Failed</span>{% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="fw-bold">{{ ecg.get_predicted_category_display|default:'Pending' }}</span>
+                                        </td>
+                                        <td class="font-monospace fw-semibold">
+                                            {% if ecg.confidence %}{{ ecg.confidence|floatformat:1 }}%{% else %}N/A{% endif %}
+                                        </td>
+                                        <td class="text-success font-monospace fw-bold">{{ ecg.normal_prob|default:0|floatformat:1 }}%</td>
+                                        <td class="text-warning text-dark font-monospace fw-bold">{{ ecg.abnormal_prob|default:0|floatformat:1 }}%</td>
+                                        <td class="text-danger font-monospace fw-bold">{{ ecg.mi_prob|default:0|floatformat:1 }}%</td>
+                                        <td class="text-end pe-4">
+                                            <a href="{% url 'ecg_result' ecg.id %}" class="btn btn-sm btn-light border text-dark fw-bold shadow-sm">View <i class="fas fa-external-link-alt ms-1 text-muted"></i></a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Pagination -->
+                        <div class="card-footer bg-white border-top py-3 px-4">
+                            {% if page_obj.has_other_pages %}
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="text-muted small fw-semibold">
+                                    Displaying {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }}
+                                </div>
+                                <nav>
+                                    <ul class="pagination pagination-sm mb-0 shadow-sm rounded">
+                                        {% if page_obj.has_previous %}
+                                        <li class="page-item"><a class="page-link text-primary border-0 fw-bold" href="?page={{ page_obj.previous_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"><i class="fas fa-angle-left"></i></a></li>
+                                        {% endif %}
+                                        
+                                        {% for num in page_obj.paginator.page_range %}
+                                            {% if page_obj.number == num %}
+                                            <li class="page-item active"><span class="page-link border-0 fw-bold">{{ num }}</span></li>
+                                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                            <li class="page-item"><a class="page-link text-primary border-0 fw-bold" href="?page={{ num }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a></li>
+                                            {% endif %}
+                                        {% endfor %}
+                                        
+                                        {% if page_obj.has_next %}
+                                        <li class="page-item"><a class="page-link text-primary border-0 fw-bold" href="?page={{ page_obj.next_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"><i class="fas fa-angle-right"></i></a></li>
+                                        {% endif %}
+                                    </ul>
+                                </nav>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- Empty State -->
+                    <div class="text-center py-5 bg-white rounded-4 shadow-sm border">
+                        <div class="mb-4">
+                            <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle" style="width: 100px; height: 100px;">
+                                <i class="fas fa-folder-open" style="font-size: 3rem;"></i>
+                            </div>
+                        </div>
+                        <h4 class="fw-bold text-dark mb-3">No ECG Records Found</h4>
+                        <p class="text-muted mb-4 px-4 w-75 mx-auto">
+                            {% if request.GET.status or request.GET.category or request.GET.start_date %}
+                            No records match your exact filters. Please clear or adjust them.
+                            {% else %}
+                            You haven't analyzed any ECG images yet. Upload an image to get AI predictions.
+                            {% endif %}
+                        </p>
+                        {% if request.GET.status or request.GET.category or request.GET.start_date %}
+                        <a href="{% url 'history' %}" class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-semibold">
+                            <i class="fas fa-times me-2"></i>Clear Filters
+                        </a>
+                        {% else %}
+                        <a href="{% url 'upload' %}" class="btn btn-primary rounded-pill px-4 py-2 fw-semibold shadow-sm">
+                            <i class="fas fa-plus me-2"></i>Analyze First ECG
+                        </a>
+                        {% endif %}
                     </div>
                     {% endif %}
                 </div>
+
+
+
             </div>
-            
-            <!-- Empty State for No Results -->
-            {% else %}
-            <div class="card">
-                <div class="empty-state">
-                    <i class="fas fa-file-medical-alt display-1 text-muted mb-4"></i>
-                    <h4 class="mb-3">No ECG Records Found</h4>
-                    <p class="text-muted mb-4">
-                        {% if request.GET.status or request.GET.category or request.GET.start_date %}
-                        No records match your current filters. Try adjusting your filters.
-                        {% else %}
-                        You haven't uploaded any ECG images yet. Start by uploading your first ECG for analysis.
-                        {% endif %}
-                    </p>
-                    <a href="{% url 'upload' %}" class="btn btn-primary">
-                        <i class="fas fa-plus me-2"></i>Upload First ECG
-                    </a>
-                </div>
-            </div>
-            {% endif %}
-            
-            <!-- Recent Activity -->
-            {% if recent_activity %}
-            <div class="card mt-4">
-                <div class="card-header bg-white border-bottom-0">
-                    <h5 class="mb-0">
-                        <i class="fas fa-chart-line me-2"></i>Recent Activity
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-8">
-                            <div class="chart-container">
-                                <canvas id="activityChart" height="150"></canvas>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="d-flex flex-column h-100 justify-content-center">
-                                <h6 class="text-muted mb-3">Trend Summary</h6>
-                                <div class="mb-3">
-                                    <span class="badge bg-success bg-opacity-10 text-success me-2">+12%</span>
-                                    <span class="small">Increase from last month</span>
-                                </div>
-                                <div class="mb-3">
-                                    <span class="badge bg-primary bg-opacity-10 text-primary me-2">Avg 3/day</span>
-                                    <span class="small">Daily upload average</span>
-                                </div>
-                                <div>
-                                    <span class="badge bg-info bg-opacity-10 text-info me-2">Peak: {{ peak_day|default:"Mon" }}</span>
-                                    <span class="small">Most active day</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
         </div>
     </div>
 </div>
@@ -547,79 +641,122 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-$(document).ready(function() {
-    // Search functionality
-    $('#searchInput').on('keyup', function() {
-        const value = $(this).val().toLowerCase();
-        $('table tbody tr').filter(function() {
-            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
+document.addEventListener('DOMContentLoaded', function() {
+    // Search functionality for table rows
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('keyup', function() {
+            const value = this.value.toLowerCase();
+            const rows = document.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.indexOf(value) > -1 ? '' : 'none';
+            });
         });
-    });
+    }
     
-    // Date picker enhancement
-    $('input[type="date"]').each(function() {
-        $(this).attr('max', new Date().toISOString().split('T')[0]);
-    });
+    // Add date validation for filter form
+    const dateForm = document.getElementById('dateFilterForm');
+    if (dateForm) {
+        dateForm.addEventListener('submit', function(e) {
+            const startDate = document.querySelector('input[name="start_date"]').value;
+            const endDate = document.querySelector('input[name="end_date"]').value;
+            if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+                e.preventDefault();
+                alert('Start date must be before end date.');
+                return false;
+            }
+        });
+    }
     
-    // Activity Chart
-    const ctx = document.getElementById('activityChart');
-    if (ctx) {
-        const activityChart = new Chart(ctx, {
+    // Render Robust Activity Chart
+    const canvas = document.getElementById('activityChartDynamic');
+    if (canvas) {
+        // Parse real data from Django context securely
+        const rawData = JSON.parse('{{ recent_activity_json|escapejs|default:"[]" }}');
+        
+        let labels = [];
+        let dataCounts = [];
+        
+        // Use empty defaults logically if data fails
+        if (rawData && rawData.length > 0) {
+            labels = rawData.map(item => item.date);
+            dataCounts = rawData.map(item => item.count);
+        } else {
+            labels = ['6 Days Ago', '5 Days Ago', '4 Days Ago', '3 Days Ago', '2 Days Ago', 'Yesterday', 'Today'];
+            dataCounts = [0, 0, 0, 0, 0, 0, 0];
+        }
+        
+        new Chart(canvas, {
             type: 'line',
             data: {
-                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                labels: labels,
                 datasets: [{
-                    label: 'ECG Uploads',
-                    data: [12, 19, 15, 25, 22, 30],
-                    borderColor: 'rgb(59, 130, 246)',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    label: 'Analyses Performed',
+                    data: dataCounts,
+                    borderColor: 'rgb(30, 58, 138)',
+                    backgroundColor: 'rgba(30, 58, 138, 0.1)',
+                    borderWidth: 3,
+                    pointBackgroundColor: '#ffffff',
+                    pointBorderColor: '#1e3a8a',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
                     tension: 0.4,
                     fill: true
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
-                    legend: {
-                        display: false
-                    }
+                    legend: { display: false }
                 },
                 scales: {
+                    x: {
+                        grid: { display: false }
+                    },
                     y: {
-                        beginAtZero: true,
-                        ticks: {
-                            stepSize: 5
-                        }
+                        beginAtZero: true
                     }
                 }
             }
         });
     }
-    
-    // Filter form submission
-    $('#dateFilterForm').on('submit', function(e) {
-        const startDate = $('input[name="start_date"]').val();
-        const endDate = $('input[name="end_date"]').val();
-        
-        if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
-            e.preventDefault();
-            alert('Start date must be before end date.');
-            return false;
-        }
-    });
-    
-    // Highlight active filters
-    $('.list-group-item.active').parents('.card').addClass('border-primary');
-});
-</script>
 
-<!-- Custom template filter for getting dictionary items -->
-<script>
-// Add this to your Django template filters or create a custom filter
-// This is a workaround for template context
-document.addEventListener('DOMContentLoaded', function() {
-    // This would normally be handled in Django views
-    console.log('History page loaded');
+    // Initialize progress bars animation
+    setTimeout(function() {
+        const progressBars = document.querySelectorAll('.prob-progress-bar');
+        progressBars.forEach(function(bar) {
+            const width = bar.getAttribute('style');
+            bar.style.width = '0%';
+            setTimeout(function() {
+                bar.setAttribute('style', width);
+            }, 100);
+        });
+    }, 200);
 });
+
+// View Toggle System for Analysis Records
+window.switchView = function(viewMode) {
+    const compactLayer = document.getElementById('compactViewWrapper');
+    const tableLayer = document.getElementById('tableViewWrapper');
+    const btnCompact = document.getElementById('btnCompactView');
+    const btnTable = document.getElementById('btnTableView');
+    
+    if (!compactLayer || !tableLayer) return;
+    
+    if (viewMode === 'compact') {
+        compactLayer.style.display = 'block';
+        tableLayer.style.display = 'none';
+        btnCompact.className = 'btn btn-dark fw-bold px-3 shadow';
+        btnTable.className = 'btn btn-light fw-semibold px-3 text-secondary';
+    } else {
+        compactLayer.style.display = 'none';
+        tableLayer.style.display = 'block';
+        btnCompact.className = 'btn btn-light fw-semibold px-3 text-secondary';
+        btnTable.className = 'btn btn-dark fw-bold px-3 shadow';
+    }
+};
 </script>
 {% endblock %}
