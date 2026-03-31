@@ -277,7 +277,14 @@ def _get_mimetype(path):
 
 
 def _build_html_body(record):
-    """Plain but clean HTML email body — no embedded images."""
+    """
+    Redesigned HTML email body matching the PDF report style:
+    - Colour-coded diagnosis banner with confidence bar
+    - Two-column layout: Record Details | Probability Breakdown
+    - Full patient details with alternating row shading
+    - Disclaimer footer
+    """
+    # ── Colour palette per diagnosis ──────────────────────────────────────────
     colour_map = {
         'normal':   ('#10b981', '#d1fae5', '#065f46'),
         'abnormal': ('#f59e0b', '#fef3c7', '#92400e'),
@@ -285,8 +292,12 @@ def _build_html_body(record):
         'post_mi':  ('#0ea5e9', '#e0f2fe', '#0c4a6e'),
     }
     cat = record.predicted_category
-    badge_color, badge_bg, alert_color = colour_map.get(cat, ('#64748b', '#f1f5f9', '#1e293b'))
+    accent, banner_bg, dark = colour_map.get(cat, ('#64748b', '#f1f5f9', '#1e293b'))
+    disp  = record.get_predicted_category_display()
+    conf  = record.confidence or 0
+    full_name = record.user.get_full_name() or record.user.username
 
+    # ── Probability bars ──────────────────────────────────────────────────────
     probs = [
         ('Normal ECG',            record.normal_prob,   '#10b981'),
         ('Abnormal Heartbeat',    record.abnormal_prob, '#f59e0b'),
@@ -294,165 +305,294 @@ def _build_html_body(record):
         ('Post MI History',       record.post_mi_prob,  '#0ea5e9'),
     ]
     prob_rows = ''
-    for label, value, color in probs:
-        bar_width = max(2, round(value))
+    for i, (label, value, color) in enumerate(probs):
+        bar_w  = max(2, round(value))
+        row_bg = '#f8fafc' if i % 2 == 0 else '#ffffff'
         prob_rows += f'''
-        <tr>
-            <td style="padding:5px 10px;font-size:13px;color:#334155;width:42%;">{label}</td>
-            <td style="padding:5px 10px;width:45%;">
-                <div style="background:#e2e8f0;border-radius:6px;height:13px;">
-                    <div style="background:{color};width:{bar_width}%;height:13px;border-radius:6px;"></div>
-                </div>
-            </td>
-            <td style="padding:5px 10px;font-size:13px;font-weight:bold;
-                       color:#0f172a;text-align:right;width:13%;">{round(value,1)}%</td>
+        <tr style="background:{row_bg};">
+          <td style="padding:6px 10px;font-size:12px;color:#334155;width:40%;
+                     border-bottom:1px solid #e2e8f0;">{label}</td>
+          <td style="padding:6px 8px;width:42%;border-bottom:1px solid #e2e8f0;">
+            <div style="background:#e2e8f0;border-radius:5px;height:12px;width:100%;">
+              <div style="background:{color};width:{bar_w}%;height:12px;border-radius:5px;"></div>
+            </div>
+          </td>
+          <td style="padding:6px 10px;font-size:12px;font-weight:bold;color:#0f172a;
+                     text-align:right;width:18%;border-bottom:1px solid #e2e8f0;">
+            {round(value,1)}%
+          </td>
         </tr>'''
 
-    patient_row = ''
+    # ── Record details rows (with alternating shading) ────────────────────────
+    def row(label, value, idx):
+        bg = '#f8fafc' if idx % 2 == 0 else '#ffffff'
+        return (f'<tr style="background:{bg};">'
+                f'<td style="padding:7px 12px;color:#475569;font-weight:bold;'
+                f'width:38%;border-bottom:1px solid #e2e8f0;font-size:12px;">{label}</td>'
+                f'<td style="padding:7px 12px;color:#0f172a;border-bottom:1px solid #e2e8f0;'
+                f'font-size:12px;">{value}</td></tr>')
+
+    detail_rows = ''
+    idx = 0
+    detail_rows += row('Record ID',   f'#{record.id}', idx); idx += 1
+    detail_rows += row('Date & Time', record.upload_date.strftime('%d %b %Y, %H:%M'), idx); idx += 1
+    detail_rows += row('Uploaded By', full_name, idx); idx += 1
+
     if record.patient:
-        age = f' (Age: {record.patient.age})' if record.patient.age else ''
-        patient_row = f'''
-        <tr>
-            <td style="padding:8px 12px;color:#475569;font-weight:bold;
-                       background:#f8fafc;border-bottom:1px solid #e2e8f0;">Patient</td>
-            <td style="padding:8px 12px;color:#0f172a;border-bottom:1px solid #e2e8f0;">
-                {record.patient.name}{age}</td>
-        </tr>'''
+        p = record.patient
+        age_str = f' &nbsp;(Age: {p.age})' if p.age else ''
+        detail_rows += row('Patient', f'{p.name}{age_str}', idx); idx += 1
+        if p.gender:
+            detail_rows += row('Gender', p.get_gender_display(), idx); idx += 1
+        if p.contact_number:
+            detail_rows += row('Contact', p.contact_number, idx); idx += 1
 
-    notes_section = ''
+    # Diagnosis badge row
+    badge_html = (f'<span style="background:{banner_bg};color:{dark};'
+                  f'border:1px solid {accent};border-radius:4px;'
+                  f'padding:2px 10px;font-weight:bold;">{disp}</span>')
+    detail_rows += row('Diagnosis', badge_html, idx); idx += 1
+    detail_rows += row('AI Confidence', f'<strong>{conf:.1f}%</strong>', idx); idx += 1
+    detail_rows += row('Status', record.get_status_display(), idx); idx += 1
+
+    # ── Optional extra sections ───────────────────────────────────────────────
+    notes_html = ''
     if record.notes:
-        notes_section = f'''
-        <h3 style="color:#0f172a;font-size:15px;border-bottom:1px solid #cbd5e1;
-                   padding-bottom:6px;margin:24px 0 12px;">Notes</h3>
-        <p style="font-size:13px;color:#334155;margin:0;">{record.notes}</p>'''
+        notes_html = f'''
+        <div style="margin-top:18px;">
+          <p style="font-size:13px;font-weight:bold;color:#0f172a;
+                    border-bottom:1px solid #e2e8f0;padding-bottom:4px;margin:0 0 8px;">
+            Clinical Notes
+          </p>
+          <p style="font-size:13px;color:#334155;margin:0;line-height:1.6;">
+            {record.notes}
+          </p>
+        </div>'''
+
+    doctor_notes_html = ''
+    if record.doctor_notes:
+        doctor_notes_html = f'''
+        <div style="margin-top:14px;">
+          <p style="font-size:13px;font-weight:bold;color:#0f172a;
+                    border-bottom:1px solid #e2e8f0;padding-bottom:4px;margin:0 0 8px;">
+            Physician Notes
+          </p>
+          <p style="font-size:13px;color:#334155;margin:0;line-height:1.6;">
+            {record.doctor_notes}
+          </p>
+        </div>'''
+
+    med_history_html = ''
+    if record.patient and record.patient.medical_history:
+        med_history_html = f'''
+        <div style="margin-top:14px;">
+          <p style="font-size:13px;font-weight:bold;color:#0f172a;
+                    border-bottom:1px solid #e2e8f0;padding-bottom:4px;margin:0 0 8px;">
+            Medical History
+          </p>
+          <p style="font-size:13px;color:#334155;margin:0;line-height:1.6;">
+            {record.patient.medical_history}
+          </p>
+        </div>'''
+
+    # ── Confidence bar (for the banner) ───────────────────────────────────────
+    conf_bar_w = max(2, round(conf))
 
     return f'''<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:Helvetica,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 0;">
+
+<table width="100%" cellpadding="0" cellspacing="0"
+       style="background:#f1f5f9;padding:28px 0;">
 <tr><td align="center">
-<table width="620" cellpadding="0" cellspacing="0"
+<table width="640" cellpadding="0" cellspacing="0"
        style="background:#ffffff;border-radius:14px;
-              box-shadow:0 4px 24px rgba(0,0,0,0.09);overflow:hidden;max-width:100%;">
-    <tr>
-        <td style="background:#0c4a6e;padding:28px 32px;text-align:center;">
-            <h1 style="color:#ffffff;margin:0;font-size:22px;letter-spacing:1px;">
-                &#10084; CardioVision AI
+              box-shadow:0 4px 24px rgba(0,0,0,0.10);
+              overflow:hidden;max-width:100%;">
+
+  <!-- ── Header banner ──────────────────────────────────────────── -->
+  <tr>
+    <td style="background:#0c4a6e;padding:24px 32px;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td>
+            <h1 style="color:#ffffff;margin:0;font-size:20px;letter-spacing:0.5px;">
+              &#10084; CardioVision AI
             </h1>
-            <p style="color:#bae6fd;margin:6px 0 0;font-size:13px;">
-                Automated ECG Analysis &amp; Report
+            <p style="color:#bae6fd;margin:4px 0 0;font-size:12px;">
+              Automated ECG Analysis &amp; Explainability Report
             </p>
-        </td>
-    </tr>
-    <tr><td style="padding:28px 32px;">
-
-        <p style="font-size:15px;color:#1e293b;margin:0 0 8px;">
-            Dear <strong>{record.user.get_full_name() or record.user.username}</strong>,
-        </p>
-        <p style="font-size:14px;color:#475569;margin:0 0 20px;line-height:1.6;">
-            Your ECG analysis has been completed. Please find the attachments below.
-        </p>
-
-        <!-- Attachments notice -->
-        <div style="background:#eff6ff;border-left:4px solid #3b82f6;
-                    padding:12px 16px;margin:0 0 24px;border-radius:0 6px 6px 0;">
-            <p style="margin:0;font-size:13px;color:#1e40af;line-height:1.8;">
-                <strong>&#128206; Attachments:</strong><br>
-                &bull; <strong>ECG_Result_{record.id}.png</strong>
-                &nbsp;— ECG image with AI prediction result overlay<br>
-                &bull; <strong>ECG_Report_{record.id}.pdf</strong>
-                &nbsp;— Full analysis report with LIME explainability
+          </td>
+          <td style="text-align:right;vertical-align:top;">
+            <p style="color:#bae6fd;margin:0;font-size:11px;">
+              Report #{record.id}<br>
+              {record.upload_date.strftime("%d %b %Y, %H:%M")}
             </p>
-        </div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
 
-        <!-- Diagnosis badge -->
-        <div style="text-align:center;margin-bottom:24px;">
-            <div style="display:inline-block;background:{badge_bg};
-                        color:{alert_color};border:2px solid {badge_color};
-                        border-radius:50px;padding:10px 30px;
-                        font-size:18px;font-weight:bold;">
-                {record.get_predicted_category_display()}
+  <!-- ── Salutation ─────────────────────────────────────────────── -->
+  <tr>
+    <td style="padding:24px 32px 0;">
+      <p style="font-size:15px;color:#1e293b;margin:0 0 6px;">
+        Dear <strong>{full_name}</strong>,
+      </p>
+      <p style="font-size:13.5px;color:#475569;margin:0 0 20px;line-height:1.6;">
+        Your ECG analysis has been completed. Please find the detailed results
+        below and the full report attached.
+      </p>
+    </td>
+  </tr>
+
+  <!-- ── Colour-coded Diagnosis Banner ──────────────────────────── -->
+  <tr>
+    <td style="padding:0 32px 20px;">
+      <table width="100%" cellpadding="0" cellspacing="0"
+             style="background:{banner_bg};border:1.5px solid {accent};
+                    border-radius:10px;overflow:hidden;">
+        <tr>
+          <td style="padding:16px 20px;width:60%;vertical-align:middle;">
+            <p style="font-size:10px;color:{dark};text-transform:uppercase;
+                      letter-spacing:1px;margin:0 0 4px;font-weight:bold;">
+              Primary Diagnosis
+            </p>
+            <p style="font-size:19px;font-weight:bold;color:{dark};margin:0 0 6px;">
+              {disp}
+            </p>
+            <p style="font-size:12px;color:{dark};margin:0 0 6px;">
+              AI Confidence: <strong>{conf:.1f}%</strong>
+            </p>
+            <!-- Confidence bar -->
+            <div style="background:rgba(0,0,0,0.12);border-radius:5px;
+                        height:9px;width:100%;">
+              <div style="background:{accent};width:{conf_bar_w}%;height:9px;
+                          border-radius:5px;"></div>
             </div>
-            <p style="color:#64748b;font-size:13px;margin:8px 0 0;">
-                AI Confidence:
-                <strong style="color:{badge_color};">{record.confidence:.1f}%</strong>
+          </td>
+          <td style="padding:16px 20px;width:40%;text-align:center;
+                     vertical-align:middle;">
+            <div style="display:inline-block;background:{accent};color:#ffffff;
+                        border-radius:30px;padding:8px 20px;
+                        font-size:13px;font-weight:bold;">
+              Record #{record.id}
+            </div>
+            <p style="font-size:11px;color:{dark};margin:8px 0 0;">
+              {record.upload_date.strftime("%d %b %Y")}
             </p>
-        </div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
 
-        <!-- Record details -->
-        <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;
-                      border-radius:8px;overflow:hidden;margin-bottom:20px;font-size:13px;">
-            <tr>
-                <td style="padding:8px 12px;color:#475569;font-weight:bold;
-                           background:#f8fafc;width:38%;border-bottom:1px solid #e2e8f0;">
-                    Record ID</td>
-                <td style="padding:8px 12px;color:#0f172a;border-bottom:1px solid #e2e8f0;">
-                    #{record.id}</td>
-            </tr>
-            <tr>
-                <td style="padding:8px 12px;color:#475569;font-weight:bold;
-                           background:#f8fafc;border-bottom:1px solid #e2e8f0;">
-                    Upload Date</td>
-                <td style="padding:8px 12px;color:#0f172a;border-bottom:1px solid #e2e8f0;">
-                    {record.upload_date.strftime("%B %d, %Y at %H:%M")}</td>
-            </tr>
-            {patient_row}
-            <tr>
-                <td style="padding:8px 12px;color:#475569;font-weight:bold;
-                           background:#f8fafc;border-bottom:1px solid #e2e8f0;">
-                    Diagnosis</td>
-                <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;">
-                    <span style="background:{badge_bg};color:{alert_color};
-                                 border:1px solid {badge_color};border-radius:4px;
-                                 padding:2px 10px;font-weight:bold;">
-                        {record.get_predicted_category_display()}
-                    </span>
-                </td>
-            </tr>
-            <tr>
-                <td style="padding:8px 12px;color:#475569;font-weight:bold;
-                           background:#f8fafc;">Uploaded By</td>
-                <td style="padding:8px 12px;color:#0f172a;">
-                    {record.user.get_full_name() or record.user.username}</td>
-            </tr>
-        </table>
+  <!-- ── Attachments notice ──────────────────────────────────────── -->
+  <tr>
+    <td style="padding:0 32px 20px;">
+      <div style="background:#eff6ff;border-left:4px solid #3b82f6;
+                  padding:11px 15px;border-radius:0 6px 6px 0;">
+        <p style="margin:0;font-size:12.5px;color:#1e40af;line-height:1.9;">
+          <strong>&#128206; Attachments included:</strong><br>
+          &bull; <strong>ECG_Result_{record.id}.png</strong>
+          &nbsp;&mdash; ECG image with AI prediction overlay<br>
+          &bull; <strong>ECG_Report_{record.id}.pdf</strong>
+          &nbsp;&mdash; Full analysis report (with LIME explainability)
+        </p>
+      </div>
+    </td>
+  </tr>
 
-        <!-- Probability breakdown -->
-        <h3 style="color:#0f172a;font-size:15px;border-bottom:1px solid #cbd5e1;
-                   padding-bottom:6px;margin:0 0 12px;">Probability Breakdown</h3>
-        <table style="width:100%;border-collapse:collapse;">{prob_rows}</table>
+  <!-- ── Two-column: Record Details | Probability Breakdown ─────── -->
+  <tr>
+    <td style="padding:0 32px 20px;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
 
-        {notes_section}
+          <!-- LEFT: Record Details -->
+          <td style="width:48%;vertical-align:top;padding-right:10px;">
+            <p style="font-size:13px;font-weight:bold;color:#0c4a6e;
+                      border-bottom:2px solid #0c4a6e;padding-bottom:4px;
+                      margin:0 0 0 0;">Record Details</p>
+            <table width="100%" cellpadding="0" cellspacing="0"
+                   style="border-collapse:collapse;border:1px solid #e2e8f0;
+                          border-radius:6px;overflow:hidden;">
+              {detail_rows}
+            </table>
+          </td>
 
-        <!-- Disclaimer -->
-        <div style="background:#fefce8;border-left:4px solid #f59e0b;
-                    padding:12px 16px;margin-top:28px;border-radius:0 6px 6px 0;">
-            <p style="margin:0;font-size:12px;color:#713f12;line-height:1.7;">
-                <strong>Medical Disclaimer:</strong> This is an AI-assisted tool for
-                informational purposes only. It is not a substitute for professional
-                medical diagnosis. Always consult a qualified healthcare professional.
-            </p>
-        </div>
+          <td style="width:4%;"></td>
 
-    </td></tr>
-    <tr>
-        <td style="background:#f8fafc;padding:16px 32px;text-align:center;
-                   border-top:1px solid #e2e8f0;">
-            <p style="margin:0;font-size:11px;color:#94a3b8;">
-                CardioVision AI &nbsp;&#183;&nbsp; Report #{record.id}
-                &nbsp;&#183;&nbsp; {record.upload_date.strftime("%Y-%m-%d")}
-            </p>
-        </td>
-    </tr>
+          <!-- RIGHT: Probability Breakdown -->
+          <td style="width:48%;vertical-align:top;padding-left:10px;">
+            <p style="font-size:13px;font-weight:bold;color:#0c4a6e;
+                      border-bottom:2px solid #0c4a6e;padding-bottom:4px;
+                      margin:0 0 0 0;">Probability Breakdown</p>
+            <table width="100%" cellpadding="0" cellspacing="0"
+                   style="border-collapse:collapse;border:1px solid #e2e8f0;
+                          border-radius:6px;overflow:hidden;">
+              {prob_rows}
+            </table>
+          </td>
+
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- ── Optional extra sections (notes / medical history) ──────── -->
+  {f'<tr><td style="padding:0 32px 16px;">{notes_html}{doctor_notes_html}{med_history_html}</td></tr>'
+    if (notes_html or doctor_notes_html or med_history_html) else ''}
+
+  <!-- ── Disclaimer ─────────────────────────────────────────────── -->
+  <tr>
+    <td style="padding:0 32px 24px;">
+      <div style="background:#fefce8;border-left:4px solid #f59e0b;
+                  padding:11px 15px;border-radius:0 6px 6px 0;">
+        <p style="margin:0;font-size:11.5px;color:#713f12;line-height:1.7;">
+          <strong>Medical Disclaimer:</strong> This report is automatically
+          generated by an AI-assisted analysis tool and is intended for
+          informational purposes only. It must not replace professional medical
+          diagnosis, advice, or treatment. Always consult a qualified healthcare
+          professional for clinical decisions.
+        </p>
+      </div>
+    </td>
+  </tr>
+
+  <!-- ── Footer ─────────────────────────────────────────────────── -->
+  <tr>
+    <td style="background:#f8fafc;padding:13px 32px;text-align:center;
+               border-top:1px solid #e2e8f0;">
+      <p style="margin:0;font-size:11px;color:#94a3b8;">
+        CardioVision AI &nbsp;&#183;&nbsp; Report #{record.id}
+        &nbsp;&#183;&nbsp; {record.upload_date.strftime("%Y-%m-%d")}
+        &nbsp;&#183;&nbsp; For informational use only
+      </p>
+    </td>
+  </tr>
+
 </table>
 </td></tr>
 </table>
+
 </body>
 </html>'''
 
 
+
+
 # ── Email Task ─────────────────────────────────────────────────────────────────
+
+
+
+# ── Email Task ─────────────────────────────────────────────────────────────────
+
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=30)
 def send_pdf_report_email_task(self, ecg_id):
@@ -550,4 +690,158 @@ def send_pdf_report_email_task(self, ecg_id):
         return False
     except Exception as exc:
         logger.error(f"Email task failed for ECG #{ecg_id}: {exc}", exc_info=True)
+        raise self.retry(exc=exc)
+
+
+# ── Email Verification Task ────────────────────────────────────────────────────
+
+def _build_verification_email_html(user, verification_url):
+    """Builds a styled HTML verification email body."""
+    full_name = user.get_full_name() or user.username
+    return f'''<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 0;">
+<tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0"
+       style="background:#ffffff;border-radius:14px;
+              box-shadow:0 4px 24px rgba(0,0,0,0.09);overflow:hidden;max-width:100%;">
+    <!-- Header -->
+    <tr>
+        <td style="background:#0c4a6e;padding:28px 32px;text-align:center;">
+            <h1 style="color:#ffffff;margin:0;font-size:22px;letter-spacing:1px;">
+                &#10084; CardioVision AI
+            </h1>
+            <p style="color:#bae6fd;margin:6px 0 0;font-size:13px;">
+                Verify Your Email Address
+            </p>
+        </td>
+    </tr>
+    <!-- Body -->
+    <tr><td style="padding:32px 32px 24px;">
+        <p style="font-size:16px;color:#1e293b;margin:0 0 12px;">
+            Hello <strong>{full_name}</strong>,
+        </p>
+        <p style="font-size:14px;color:#475569;margin:0 0 24px;line-height:1.7;">
+            Thank you for registering with <strong>CardioVision AI</strong>.
+            Please verify your email address by clicking the button below.
+            This link will expire in <strong>24 hours</strong>.
+        </p>
+
+        <!-- CTA Button -->
+        <div style="text-align:center;margin:28px 0;">
+            <a href="{verification_url}"
+               style="display:inline-block;background:#0c4a6e;color:#ffffff;
+                      text-decoration:none;padding:14px 36px;border-radius:8px;
+                      font-size:15px;font-weight:bold;letter-spacing:0.5px;">
+                ✉ Verify My Email Address
+            </a>
+        </div>
+
+        <!-- Fallback link -->
+        <p style="font-size:12px;color:#94a3b8;margin:0 0 8px;">
+            If the button doesn't work, copy and paste this URL into your browser:
+        </p>
+        <p style="font-size:11px;color:#0ea5e9;word-break:break-all;margin:0 0 24px;">
+            {verification_url}
+        </p>
+
+        <!-- Security notice -->
+        <div style="background:#f0fdf4;border-left:4px solid #22c55e;
+                    padding:12px 16px;border-radius:0 6px 6px 0;margin-bottom:8px;">
+            <p style="margin:0;font-size:12px;color:#166534;line-height:1.7;">
+                <strong>&#128274; Security Notice:</strong> If you did not create an account
+                with CardioVision AI, you can safely ignore this email.
+                No account will be activated without clicking the link above.
+            </p>
+        </div>
+    </td></tr>
+    <!-- Footer -->
+    <tr>
+        <td style="background:#f8fafc;padding:16px 32px;text-align:center;
+                   border-top:1px solid #e2e8f0;">
+            <p style="margin:0;font-size:11px;color:#94a3b8;">
+                CardioVision AI &nbsp;&#183;&nbsp; This link expires in 24 hours
+            </p>
+        </td>
+    </tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>'''
+
+
+def _send_verification_email_sync(user, verification_url):
+    """
+    Sends verification email synchronously using Django's send_mail.
+    Used as a fallback when Celery/Redis is unavailable.
+    """
+    from django.core.mail import EmailMultiAlternatives
+
+    subject = 'Verify your CardioVision AI account'
+    plain_text = (
+        f"Hello {user.get_full_name() or user.username},\n\n"
+        f"Please verify your email address by visiting:\n"
+        f"{verification_url}\n\n"
+        f"This link expires in 24 hours.\n\n"
+        f"If you did not register, ignore this email.\n\n"
+        f"Regards,\nCardioVision AI"
+    )
+    html_body = _build_verification_email_html(user, verification_url)
+
+    email = EmailMultiAlternatives(
+        subject=subject,
+        body=plain_text,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+    )
+    email.attach_alternative(html_body, 'text/html')
+    email.send(fail_silently=False)
+    logger.info(f"[Sync] Verification email sent to {user.email}")
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=30)
+def send_verification_email_task(self, user_id, verification_url):
+    """
+    Celery task: sends an account verification email to the newly registered user.
+    Falls back to synchronous send if Celery is unavailable (called directly).
+    """
+    from django.contrib.auth.models import User
+
+    try:
+        user = User.objects.get(id=user_id)
+
+        if not user.email:
+            logger.warning(f"Verification email skipped: user #{user_id} has no email.")
+            return False
+
+        subject = 'Verify your CardioVision AI account'
+        plain_text = (
+            f"Hello {user.get_full_name() or user.username},\n\n"
+            f"Please verify your email address by visiting:\n"
+            f"{verification_url}\n\n"
+            f"This link expires in 24 hours.\n\n"
+            f"If you did not register, ignore this email.\n\n"
+            f"Regards,\nCardioVision AI"
+        )
+        html_body = _build_verification_email_html(user, verification_url)
+
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=plain_text,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[user.email],
+        )
+        email.attach_alternative(html_body, 'text/html')
+        email.send(fail_silently=False)
+        logger.info(f"[Celery] Verification email sent to {user.email}")
+        return True
+
+    except User.DoesNotExist:
+        logger.error(f"Verification email task: user #{user_id} not found.")
+        return False
+    except Exception as exc:
+        logger.error(f"Verification email task failed for user #{user_id}: {exc}", exc_info=True)
         raise self.retry(exc=exc)

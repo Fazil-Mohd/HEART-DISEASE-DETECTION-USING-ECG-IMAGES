@@ -4,6 +4,52 @@ from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
 from .models import ECGRecord, Patient, UserProfile
 
+
+def validate_email_domain(email):
+    """
+    Checks that the email's domain has real, working MX (mail) records.
+    - NXDOMAIN           -> domain doesn't exist        -> reject
+    - NoAnswer           -> no MX record at all          -> reject
+    - MX -> localhost/.  -> broken/placeholder MX        -> reject
+    - Timeout/network    -> allow (don't block on blip)
+    """
+    if not email:
+        return
+    domain = email.split('@')[-1]
+    try:
+        import dns.resolver
+        answers = dns.resolver.resolve(domain, 'MX', lifetime=5)
+
+        # Reject placeholder MX records (localhost / null MX '.')
+        invalid_targets = {'localhost', 'localhost.', '.'}
+        all_invalid = all(
+            str(r.exchange).rstrip('.').lower() in invalid_targets
+            for r in answers
+        )
+        if all_invalid:
+            raise forms.ValidationError(
+                f'The domain "{domain}" does not have a working mail server. '
+                f'Please enter a valid email address (e.g. name@gmail.com).'
+            )
+
+    except dns.resolver.NXDOMAIN:
+        raise forms.ValidationError(
+            f'The domain "{domain}" does not exist. '
+            f'Please enter a valid email address (e.g. name@gmail.com).'
+        )
+    except dns.resolver.NoAnswer:
+        raise forms.ValidationError(
+            f'The domain "{domain}" does not appear to accept email. '
+            f'Please enter a valid email address.'
+        )
+    except forms.ValidationError:
+        raise   # re-raise our own error
+    except Exception:
+        # Network timeout or DNS unavailable — accept the address
+        # so a connectivity blip never blocks a legitimate user.
+        pass
+
+
 class UserRegisterForm(UserCreationForm):
     email = forms.EmailField(
         required=True,
@@ -65,7 +111,9 @@ class UserRegisterForm(UserCreationForm):
         email = self.cleaned_data.get('email')
         if User.objects.filter(email=email).exists():
             raise forms.ValidationError("A user with that email already exists.")
+        validate_email_domain(email)
         return email
+
 
 class UserLoginForm(AuthenticationForm):
     username = forms.CharField(
@@ -112,6 +160,13 @@ class PatientForm(forms.ModelForm):
             'contact_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Phone Number (Optional)'}),
             'medical_history': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Prior conditions, medications (Optional)...'}),
         }
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email', '').strip()
+        if not email:
+            return email   # field is optional — skip validation
+        validate_email_domain(email)
+        return email
 
 class ECGUploadForm(forms.ModelForm):
     class Meta:

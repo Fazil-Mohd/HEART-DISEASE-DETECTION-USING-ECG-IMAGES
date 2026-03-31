@@ -8,6 +8,12 @@ urlpatterns = [
     path('register/', views.register_view, name='register'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
+
+    # Email Verification URLs
+    path('verify-email/<uuid:token>/', views.verify_email_view, name='verify_email'),
+    path('verify-email/pending/', views.email_verification_pending_view, name='email_pending'),
+    path('resend-verification/', views.resend_verification_view, name='resend_verification'),
+
     
     # Core Application URLs (User actions only)
     path('', views.home_view, name='home'),

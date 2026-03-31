@@ -7,7 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # IMPORTANT: Move SECRET_KEY to an environment variable before deploying.
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-your-secret-key-here')
 DEBUG = True
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 # ── APPS ───────────────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
@@ -160,7 +160,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # IMPORTANT: Move SECRET_KEY to an environment variable before deploying.
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-your-secret-key-here')
 DEBUG = True
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 # ── APPS ───────────────────────────────────────────────────────────────────────
 INSTALLED_APPS = [

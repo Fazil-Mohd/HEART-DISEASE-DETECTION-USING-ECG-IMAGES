@@ -173,8 +173,12 @@ def generate_pdf_report_content(ecg_id, request=None):
 
         # ── Original ECG image path ───────────────────────────────────────────
         ecg_image_path = ''
-        if record.image:
-            ecg_image_path = record.image.path.replace('\\', '/')
+        if record.image and os.path.exists(record.image.path):
+            import urllib.parse as _up
+            raw = record.image.path.replace('\\', '/')
+            # URL-encode spaces and special chars so the file:/// URI is valid;
+            # _link_callback will decode it back to a real OS path.
+            ecg_image_path = _up.quote(raw, safe='/:')
 
         # ── Probabilities ─────────────────────────────────────────────────────
         probabilities = {
@@ -194,7 +198,10 @@ def generate_pdf_report_content(ecg_id, request=None):
             media_url = settings.MEDIA_URL
             rel = url[len(media_url):] if url.startswith(media_url) else url.lstrip('/')
             abs_path = os.path.join(settings.MEDIA_ROOT, rel)
-            return abs_path.replace('\\', '/') if os.path.exists(abs_path) else None
+            if not os.path.exists(abs_path):
+                return None
+            import urllib.parse as _up
+            return _up.quote(abs_path.replace('\\', '/'), safe=':/')
 
         lime_normal   = lime_path('normal')
         lime_abnormal = lime_path('abnormal')
@@ -238,9 +245,36 @@ def generate_pdf_report_content(ecg_id, request=None):
 
         html_string = render_to_string('ecg_app/pdf_report.html', context)
 
+        # ── link_callback: fixes image loading when path contains spaces ──────
+        # xhtml2pdf cannot load images whose file:/// URI has spaces (like
+        # "E:/Major Project/..."). The link_callback intercepts every resource
+        # URI and returns a proper filesystem path that Python can open.
+        import urllib.parse
+
+        def _link_callback(uri, rel):
+            """Convert any URI in the PDF HTML to an absolute OS file path."""
+            # file:/// absolute URI (may contain %20 for spaces)
+            if uri.startswith('file:///'):
+                decoded = urllib.parse.unquote(uri[8:])   # remove 'file:///'
+                # Windows: decoded may start with /C:/... — strip leading slash
+                if decoded.startswith('/') and len(decoded) > 2 and decoded[2] == ':':
+                    decoded = decoded[1:]
+                return decoded
+
+            # Django MEDIA_URL-relative path
+            media_url = settings.MEDIA_URL          # e.g. '/media/'
+            if uri.startswith(media_url):
+                return os.path.join(str(settings.MEDIA_ROOT), uri[len(media_url):])
+
+            # Anything else — resolve against MEDIA_ROOT
+            return os.path.join(str(settings.MEDIA_ROOT), uri)
+
         pdf_buffer  = io.BytesIO()
-        base_url    = str(settings.MEDIA_ROOT).replace('\\', '/')
-        pisa_status = pisa.CreatePDF(html_string, dest=pdf_buffer, base_url=base_url)
+        pisa_status = pisa.CreatePDF(
+            html_string,
+            dest=pdf_buffer,
+            link_callback=_link_callback,
+        )
 
         if pisa_status.err:
             logger.error(f"xhtml2pdf error for ECG #{ecg_id}: {pisa_status.err}")

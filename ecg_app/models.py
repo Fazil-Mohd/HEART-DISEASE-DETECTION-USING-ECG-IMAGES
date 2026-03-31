@@ -1,3 +1,5 @@
+import uuid
+from datetime import timedelta
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -113,3 +115,32 @@ class TrainingSession(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+
+
+# ── EMAIL VERIFICATION ────────────────────────────────────────────────────────
+
+class EmailVerificationToken(models.Model):
+    """
+    One-to-one token tied to a User.
+    Created at registration (user.is_active=False).
+    Deleted / marked verified once the user clicks the link.
+    """
+    user       = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name='email_verification'
+    )
+    token      = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_verified = models.BooleanField(default=False)
+
+    TOKEN_EXPIRY_HOURS = 24
+
+    def is_expired(self):
+        """Returns True if the token is older than TOKEN_EXPIRY_HOURS."""
+        return timezone.now() > self.created_at + timedelta(hours=self.TOKEN_EXPIRY_HOURS)
+
+    def __str__(self):
+        return f"EmailVerification for {self.user.username} (verified={self.is_verified})"
+
+    class Meta:
+        verbose_name        = 'Email Verification Token'
+        verbose_name_plural = 'Email Verification Tokens'

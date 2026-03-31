@@ -28,38 +28,106 @@ from django.http import HttpResponse
 def register_view(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
-    
+
     if request.method == 'POST':
         form = UserRegisterForm(request.POST)
         if form.is_valid():
-            user = form.save()
+            # Create user but leave inactive until email is verified
+            user = form.save(commit=False)
+            user.is_active = False
+            user.save()
+
             role = form.cleaned_data.get('role', 'user')
             UserProfile.objects.create(user=user, role=role)
-            login(request, user)
-            messages.success(request, 'Registration successful! Welcome to ECG Analyzer.')
-            return redirect('dashboard')
+
+            # Create verification token
+            from .models import EmailVerificationToken
+            token_obj = EmailVerificationToken.objects.create(user=user)
+
+            # Build the absolute verification URL
+            verification_url = request.build_absolute_uri(
+                f'/verify-email/{token_obj.token}/'
+            )
+
+            # ── Try Celery first; fall back to synchronous send ──────────────
+            email_sent = False
+            try:
+                from .tasks import send_verification_email_task
+                send_verification_email_task.delay(user.id, verification_url)
+                email_sent = True
+            except Exception as celery_err:
+                import logging
+                logging.getLogger(__name__).warning(
+                    f"Celery unavailable ({celery_err}), falling back to sync email."
+                )
+
+            if not email_sent:
+                # Synchronous fallback — sends inline without Celery
+                from .tasks import _send_verification_email_sync
+                try:
+                    _send_verification_email_sync(user, verification_url)
+                    email_sent = True
+                except Exception as mail_err:
+                    import logging
+                    logging.getLogger(__name__).error(
+                        f"Sync verification email also failed: {mail_err}"
+                    )
+
+            # Store the email in session for display on the pending page
+            request.session['pending_verification_email'] = user.email
+
+            messages.success(
+                request,
+                f'Account created! A verification link has been sent to {user.email}. '
+                f'Please check your inbox (and spam folder) to activate your account.'
+            )
+            return redirect('email_pending')
         else:
             messages.error(request, 'Please correct the errors below.')
     else:
         form = UserRegisterForm()
-    
+
     return render(request, 'ecg_app/auth/register.html', {'form': form})
 
 
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
-    
+
     if request.method == 'POST':
         form = UserLoginForm(request, data=request.POST)
-        if form.is_valid():
-            username = form.cleaned_data.get('username')
-            password = form.cleaned_data.get('password')
-            user = authenticate(username=username, password=password)
-            
-            if user is not None:
-                login(request, user)
-                messages.success(request, f'Welcome back, {username}!')
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '')
+        user_candidate = authenticate(username=username, password=password)
+
+        if user_candidate is not None:
+            if not user_candidate.is_active:
+                # Account exists but email not yet verified
+                from .models import EmailVerificationToken
+                try:
+                    token_obj = user_candidate.email_verification
+                    has_pending_token = not token_obj.is_verified
+                except EmailVerificationToken.DoesNotExist:
+                    has_pending_token = False
+
+                if has_pending_token:
+                    request.session['pending_verification_email'] = user_candidate.email
+                    messages.warning(
+                        request,
+                        'Your email address has not been verified yet. '
+                        'Please check your inbox for the verification link, '
+                        'or resend it below.'
+                    )
+                    return render(request, 'ecg_app/auth/login.html', {
+                        'form': form,
+                        'show_resend': True,
+                        'unverified_username': username,
+                    })
+                else:
+                    messages.error(request, 'Your account is inactive. Please contact support.')
+            else:
+                login(request, user_candidate)
+                messages.success(request, f'Welcome back, {user_candidate.username}!')
                 next_page = request.GET.get('next')
                 if next_page:
                     return redirect(next_page)
@@ -68,8 +136,9 @@ def login_view(request):
             messages.error(request, 'Invalid username or password.')
     else:
         form = UserLoginForm()
-    
+
     return render(request, 'ecg_app/auth/login.html', {'form': form})
+
 
 
 @login_required
@@ -77,6 +146,141 @@ def logout_view(request):
     logout(request)
     messages.info(request, 'You have been logged out.')
     return redirect('home')
+
+
+# ========== EMAIL VERIFICATION VIEWS ==========
+
+def verify_email_view(request, token):
+    """
+    Handles the verification link clicked by the user from their email.
+    Validates the token, activates the account, and logs the user in.
+    """
+    from .models import EmailVerificationToken
+
+    try:
+        token_obj = EmailVerificationToken.objects.select_related('user').get(token=token)
+    except EmailVerificationToken.DoesNotExist:
+        messages.error(
+            request,
+            'This verification link is invalid or has already been used. '
+            'Please register again or contact support.'
+        )
+        return render(request, 'ecg_app/auth/email_verified.html', {
+            'success': False,
+            'error_type': 'invalid',
+        })
+
+    if token_obj.is_verified:
+        messages.info(request, 'Your email has already been verified. You can log in.')
+        return redirect('login')
+
+    if token_obj.is_expired():
+        messages.warning(
+            request,
+            'This verification link has expired (links are valid for 24 hours). '
+            'Please request a new one.'
+        )
+        request.session['pending_verification_email'] = token_obj.user.email
+        return render(request, 'ecg_app/auth/email_verified.html', {
+            'success': False,
+            'error_type': 'expired',
+            'user': token_obj.user,
+        })
+
+    # ── Everything is valid — activate the account ───────────────────────────
+    user = token_obj.user
+    user.is_active = True
+    user.save(update_fields=['is_active'])
+
+    token_obj.is_verified = True
+    token_obj.save(update_fields=['is_verified'])
+
+    login(request, user)
+    messages.success(
+        request,
+        f'🎉 Welcome to CardioVision AI, {user.first_name or user.username}! '
+        f'Your email has been verified and your account is now active.'
+    )
+    return render(request, 'ecg_app/auth/email_verified.html', {
+        'success': True,
+        'user': user,
+    })
+
+
+def email_verification_pending_view(request):
+    """
+    Shown after registration: tells the user to check their inbox.
+    """
+    email = request.session.get('pending_verification_email', '')
+    return render(request, 'ecg_app/auth/email_pending.html', {'email': email})
+
+
+def resend_verification_view(request):
+    """
+    Resends the verification email for an unverified account.
+    Accepts POST with 'username' field or pulls from session.
+    """
+    from .models import EmailVerificationToken
+
+    if request.method != 'POST':
+        return redirect('login')
+
+    username = request.POST.get('username', '').strip()
+    if not username:
+        messages.error(request, 'Please provide your username to resend the verification email.')
+        return redirect('login')
+
+    try:
+        user = User.objects.get(username=username, is_active=False)
+    except User.DoesNotExist:
+        # Don't reveal whether the user exists — show the same success message
+        messages.success(
+            request,
+            'If that account exists and is unverified, '
+            'a new verification email has been sent.'
+        )
+        return redirect('email_pending')
+
+    # Refresh or create the token
+    token_obj, _ = EmailVerificationToken.objects.get_or_create(user=user)
+    if token_obj.is_verified:
+        messages.info(request, 'This account is already verified. Please log in.')
+        return redirect('login')
+
+    # Generate a fresh token if the old one is expired
+    if token_obj.is_expired():
+        token_obj.delete()
+        token_obj = EmailVerificationToken.objects.create(user=user)
+
+    verification_url = request.build_absolute_uri(
+        f'/verify-email/{token_obj.token}/'
+    )
+
+    # ── Try Celery first; fall back to synchronous send ──────────────────────
+    email_sent = False
+    try:
+        from .tasks import send_verification_email_task
+        send_verification_email_task.delay(user.id, verification_url)
+        email_sent = True
+    except Exception:
+        pass
+
+    if not email_sent:
+        from .tasks import _send_verification_email_sync
+        try:
+            _send_verification_email_sync(user, verification_url)
+            email_sent = True
+        except Exception as mail_err:
+            import logging
+            logging.getLogger(__name__).error(f"Resend sync email failed: {mail_err}")
+
+    request.session['pending_verification_email'] = user.email
+    messages.success(
+        request,
+        f'A fresh verification link has been sent to {user.email}. '
+        f'Please check your inbox and spam folder.'
+    )
+    return redirect('email_pending')
 
 
 # ========== CORE USER VIEWS ==========
@@ -212,8 +416,11 @@ def upload_ecg_view(request):
                     # ── Fire LIME and email as INDEPENDENT parallel tasks ──────
                     # Email sends immediately (~5 s) without waiting 60 s for LIME
                     from .tasks import generate_lime_task, send_pdf_report_email_task
-                    generate_lime_task.delay(ecg_record.id)
-                    send_pdf_report_email_task.delay(ecg_record.id)
+                    try:
+                        generate_lime_task.delay(ecg_record.id)
+                        send_pdf_report_email_task.delay(ecg_record.id)
+                    except Exception as celery_err:
+                        print(f"Warning: Could not queue background tasks (is Redis running?): {celery_err}")
                     # ──────────────────────────────────────────────────────────
 
                     messages.success(

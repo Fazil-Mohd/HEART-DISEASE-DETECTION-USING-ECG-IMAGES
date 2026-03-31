@@ -75,7 +75,29 @@
                     Your data is securely encrypted and protected.
                 </p>
             </div>
+
+            {% if show_resend %}
+            <div class="card mt-3 border-warning" style="border-left:4px solid #f59e0b;">
+                <div class="card-body text-center py-3 px-4">
+                    <p class="mb-2" style="font-size:0.9rem;color:#92400e;">
+                        <i class="fas fa-envelope me-1"></i>
+                        <strong>Email not verified yet.</strong>
+                        Request a new verification link below.
+                    </p>
+                    <form method="post" action="{% url 'resend_verification' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="username" value="{{ unverified_username }}">
+                        <button type="submit"
+                                class="btn btn-sm btn-warning fw-semibold w-100">
+                            <i class="fas fa-paper-plane me-1"></i>
+                            Resend Verification Email
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
         </div>
     </div>
 </div>
-{% endblock %}
+{% endblock %}

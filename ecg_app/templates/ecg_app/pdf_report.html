@@ -1,393 +1,369 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <meta charset="utf-8">
-    <title>ECG Analysis Report - #{{ record.id }}</title>
+    <title>ECG Report #{{ record.id }} — CardioVision AI</title>
     <style>
+        /* ── Page ───────────────────────────────────────────────────────────── */
         @page {
             size: A4;
-            margin: 2cm;
-
-            @frame footer {
-                -pdf-frame-content: footer_content;
-                bottom: 1cm;
-                margin-left: 2cm;
-                margin-right: 2cm;
-                height: 1cm;
-            }
+            margin: 2cm 1.8cm 1.8cm 1.8cm;
         }
-
         body {
             font-family: Helvetica, Arial, sans-serif;
+            font-size: 9pt;
             color: #1e293b;
-            line-height: 1.6;
-            font-size: 10pt;
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
         }
 
         /* ── Header ─────────────────────────────────────────────────────────── */
-        .header {
-            text-align: center;
-            border-bottom: 3px solid #0369a1;
-            padding-bottom: 14px;
-            margin-bottom: 28px;
+        .hdr-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+        .hdr-left  { width: 9cm; vertical-align: middle; }
+        .hdr-right { vertical-align: middle; text-align: right; }
+        .hdr-logo  { font-size: 18pt; font-weight: bold; color: #0c4a6e; margin: 0; }
+        .hdr-sub   { font-size: 7.5pt; color: #64748b; margin: 2px 0 0; }
+        .hdr-meta  { font-size: 7.5pt; color: #475569; }
+        .hdr-line  { border: none; border-top: 2.5px solid #0c4a6e; margin: 0 0 14px; }
+
+        /* ── Diagnosis banner ───────────────────────────────────────────────── */
+        .dx-table  { width: 100%; border-collapse: collapse; margin-bottom: 12px; border-radius: 6px; }
+        .dx-main   { width: 11cm; vertical-align: middle; padding: 10px 14px; }
+        .dx-badge  { vertical-align: middle; text-align: center; padding: 10px 10px; }
+        .dx-cat    { font-size: 7pt; text-transform: uppercase; letter-spacing: 1px;
+                     font-weight: bold; margin: 0 0 2px; }
+        .dx-name   { font-size: 14pt; font-weight: bold; margin: 0 0 3px; }
+        .dx-conf   { font-size: 8pt; margin: 0 0 4px; }
+        .conf-bg   { background: rgba(0,0,0,0.15); border-radius: 4px; height: 7px; width: 90%; }
+        .conf-fill { height: 7px; border-radius: 4px; }
+        .badge-pill { display: inline-block; border-radius: 20px; padding: 5px 14px;
+                      font-size: 9pt; font-weight: bold; color: white; }
+
+        /* ── Section title ──────────────────────────────────────────────────── */
+        .sec-title {
+            font-size: 9.5pt; font-weight: bold; color: #0c4a6e;
+            border-bottom: 1.5px solid #0c4a6e;
+            padding-bottom: 2px; margin: 10px 0 6px;
         }
 
-        .header h1 {
-            color: #0c4a6e;
-            margin: 0 0 4px 0;
-            font-size: 22pt;
-            letter-spacing: 1px;
-        }
+        /* ── Two-column wrapper ─────────────────────────────────────────────── */
+        .two-col       { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        .col-left      { width: 8.6cm; vertical-align: top; padding-right: 4px; }
+        .col-right     { width: 8.6cm; vertical-align: top; padding-left: 4px; }
 
-        .header p {
-            color: #64748b;
-            margin: 0;
-            font-size: 9pt;
-        }
-
-        /* ── Section titles ──────────────────────────────────────────────────── */
-        .section {
-            margin-bottom: 26px;
-        }
-
-        .section-title {
-            color: #0f172a;
-            border-bottom: 1px solid #cbd5e1;
-            padding-bottom: 4px;
-            margin-bottom: 12px;
-            font-size: 13pt;
-        }
-
-        /* ── Info table ──────────────────────────────────────────────────────── */
-        .info-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 16px;
-        }
-
-        .info-table th,
-        .info-table td {
-            padding: 8px 10px;
-            text-align: left;
+        /* ── Details table ──────────────────────────────────────────────────── */
+        .det-table { width: 100%; border-collapse: collapse; }
+        .det-table tr:nth-child(odd)  td { background: #f8fafc; }
+        .det-table tr:nth-child(even) td { background: #ffffff; }
+        .det-table td {
+            padding: 5px 8px;
             border-bottom: 1px solid #e2e8f0;
-            font-size: 10pt;
+            font-size: 8pt;
         }
+        .det-lbl { width: 3.8cm; color: #475569; font-weight: bold; }
+        .det-val { color: #0f172a; }
 
-        .info-table th {
-            color: #475569;
-            font-weight: bold;
-            width: 38%;
-            background-color: #f8fafc;
-        }
+        /* ── Probability bars ───────────────────────────────────────────────── */
+        .prob-table { width: 100%; border-collapse: collapse; }
+        .prob-table tr:nth-child(odd)  td { background: #f8fafc; }
+        .prob-table tr:nth-child(even) td { background: #ffffff; }
+        .prob-table td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-size: 8pt; }
+        .prob-lbl  { width: 4cm; color: #334155; }
+        .prob-bar  { width: 3.2cm; }
+        .prob-bg   { background: #e2e8f0; border-radius: 4px; height: 10px; width: 100%; }
+        .prob-fill { height: 10px; border-radius: 4px; }
+        .prob-pct  { width: 1.2cm; text-align: right; font-weight: bold; color: #0f172a; }
 
-        /* ── Badges ──────────────────────────────────────────────────────────── */
-        .badge {
-            display: inline-block;
-            padding: 3px 9px;
-            border-radius: 4px;
-            color: white;
-            font-weight: bold;
-            font-size: 9pt;
-        }
-
-        .badge-danger {
-            background-color: #ef4444;
-        }
-
-        .badge-warning {
-            background-color: #f59e0b;
-        }
-
-        .badge-success {
-            background-color: #10b981;
-        }
-
-        .badge-info {
-            background-color: #0ea5e9;
-        }
-
-        /* ── Probability bars ────────────────────────────────────────────────── */
-        .prob-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 10px;
-        }
-
-        .prob-table td {
-            padding: 4px 6px;
-            vertical-align: middle;
-        }
-
-        .prob-label {
-            width: 38%;
-            font-size: 9pt;
-            color: #334155;
-        }
-
-        .prob-bar-cell {
-            width: 45%;
-        }
-
-        .prob-bar-bg {
-            background: #e2e8f0;
-            border-radius: 6px;
-            height: 14px;
-            width: 100%;
-        }
-
-        .prob-bar-fill {
-            height: 14px;
-            border-radius: 6px;
-        }
-
-        .prob-pct {
-            width: 17%;
-            font-size: 9pt;
-            text-align: right;
-            color: #0f172a;
-            font-weight: bold;
-        }
-
-        /* ── ECG image ───────────────────────────────────────────────────────── */
-        .img-container {
+        /* ── ECG image ──────────────────────────────────────────────────────── */
+        .ecg-box {
             text-align: center;
-            margin: 16px 0;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 5px;
+            background: #f8fafc;
+            margin-bottom: 10px;
             page-break-inside: avoid;
         }
+        .ecg-box img { max-width: 100%; max-height: 180px; }
+        .ecg-cap { font-size: 7pt; color: #94a3b8; margin-top: 3px; font-style: italic; }
 
-        .img-container img {
-            max-width: 100%;
-            max-height: 340px;
-            border: 1px solid #cbd5e1;
-            padding: 4px;
-        }
-
-        /* ── LIME grid ───────────────────────────────────────────────────────── */
-        .lime-grid {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 12px;
-        }
-
-        .lime-grid td {
-            width: 50%;
-            padding: 8px;
-            text-align: center;
-            vertical-align: top;
-        }
-
-        .lime-grid img {
-            max-width: 100%;
-            border: 1px solid #cbd5e1;
-            border-radius: 4px;
-        }
-
-        .lime-title {
-            font-weight: bold;
-            font-size: 9pt;
-            margin-bottom: 5px;
-            color: #334155;
-        }
-
-        /* ── Disclaimer box ──────────────────────────────────────────────────── */
+        /* ── Disclaimer ─────────────────────────────────────────────────────── */
         .disclaimer {
-            background-color: #fefce8;
-            border-left: 4px solid #f59e0b;
-            padding: 10px 14px;
-            margin-top: 20px;
-            font-size: 8.5pt;
-            color: #713f12;
-            border-radius: 0 4px 4px 0;
+            background: #fefce8; border-left: 3px solid #f59e0b;
+            padding: 7px 10px; border-radius: 0 4px 4px 0;
+            font-size: 7.5pt; color: #713f12;
+            margin-top: 8px;
         }
 
-        /* ── Footer ──────────────────────────────────────────────────────────── */
+        /* ── LIME (page 2) ──────────────────────────────────────────────────── */
+        .lime-grid { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        .lime-grid td { width: 8.6cm; padding: 5px; text-align: center; vertical-align: top; }
+        .lime-grid img { max-width: 100%; border: 1px solid #cbd5e1; border-radius: 3px; }
+        .lime-lbl { font-size: 8pt; font-weight: bold; color: #334155; margin-bottom: 3px; }
+        .lime-note { font-size: 7.5pt; color: #94a3b8; font-style: italic; }
+
+        /* ── Footer ─────────────────────────────────────────────────────────── */
         .footer {
-            margin-top: 40px;
-            text-align: center;
-            font-size: 8pt;
-            color: #94a3b8;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 8px;
+            text-align: center; font-size: 7pt; color: #94a3b8;
+            border-top: 1px solid #e2e8f0; padding-top: 5px;
+            margin-top: 10px;
         }
     </style>
 </head>
-
 <body>
 
-    <!-- xhtml2pdf page number footer -->
-    <div id="footer_content" style="text-align: right; font-size: 8pt; color: #94a3b8;">
-        Page <pdf:pagenumber> of <pdf:pagecount>
-    </div>
+<!-- ═══ PAGE 1 ════════════════════════════════════════════════════════════════ -->
 
-    <!-- ── Header ───────────────────────────────────────────────────────────── -->
-    <div class="header">
-        <h1>CardioVision AI</h1>
-        <p>Automated ECG Analysis &amp; Explainability Report</p>
-    </div>
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<table class="hdr-table">
+    <tr>
+        <td class="hdr-left">
+            <p class="hdr-logo">&#10084; CardioVision AI</p>
+            <p class="hdr-sub">Automated ECG Analysis &amp; Explainability Report</p>
+        </td>
+        <td class="hdr-right">
+            <span class="hdr-meta">
+                Report #{{ record.id }}<br>
+                {{ record.upload_date|date:"d M Y, H:i" }}
+            </span>
+        </td>
+    </tr>
+</table>
+<hr class="hdr-line">
 
-    <!-- ── Patient & Record Info ─────────────────────────────────────────────── -->
-    <div class="section">
-        <h2 class="section-title">Patient &amp; Record Details</h2>
-        <table class="info-table">
-            <tr>
-                <th>Record ID</th>
-                <td>#{{ record.id }}</td>
-            </tr>
-            <tr>
-                <th>Upload Date</th>
-                <td>{{ record.upload_date|date:"F j, Y, g:i a" }}</td>
-            </tr>
-            {% if patient_name %}
-            <tr>
-                <th>Patient</th>
-                <td>{{ patient_name }}{% if patient_age %} &nbsp;(Age: {{ patient_age }}){% endif %}</td>
-            </tr>
+
+<!-- ── Diagnosis Banner ───────────────────────────────────────────────────── -->
+{% if record.predicted_category == 'normal' %}
+<table class="dx-table" style="background:#d1fae5;border:1.5px solid #10b981;">
+    <tr>
+        <td class="dx-main">
+            <p class="dx-cat" style="color:#065f46;">Primary Diagnosis</p>
+            <p class="dx-name" style="color:#065f46;">Normal ECG</p>
+            <p class="dx-conf" style="color:#065f46;">AI Confidence: <strong>{{ record.confidence|floatformat:1 }}%</strong></p>
+            <div class="conf-bg"><div class="conf-fill" style="width:{{ record.confidence|floatformat:0 }}%;background:#10b981;"></div></div>
+        </td>
+        <td class="dx-badge"><span class="badge-pill" style="background:#10b981;">&#10003; Normal ECG</span></td>
+    </tr>
+</table>
+{% elif record.predicted_category == 'abnormal' %}
+<table class="dx-table" style="background:#fef3c7;border:1.5px solid #f59e0b;">
+    <tr>
+        <td class="dx-main">
+            <p class="dx-cat" style="color:#92400e;">Primary Diagnosis</p>
+            <p class="dx-name" style="color:#92400e;">Abnormal Heartbeat</p>
+            <p class="dx-conf" style="color:#92400e;">AI Confidence: <strong>{{ record.confidence|floatformat:1 }}%</strong></p>
+            <div class="conf-bg"><div class="conf-fill" style="width:{{ record.confidence|floatformat:0 }}%;background:#f59e0b;"></div></div>
+        </td>
+        <td class="dx-badge"><span class="badge-pill" style="background:#f59e0b;">&#9888; Abnormal</span></td>
+    </tr>
+</table>
+{% elif record.predicted_category == 'mi' %}
+<table class="dx-table" style="background:#fee2e2;border:1.5px solid #ef4444;">
+    <tr>
+        <td class="dx-main">
+            <p class="dx-cat" style="color:#991b1b;">Primary Diagnosis</p>
+            <p class="dx-name" style="color:#991b1b;">Myocardial Infarction</p>
+            <p class="dx-conf" style="color:#991b1b;">AI Confidence: <strong>{{ record.confidence|floatformat:1 }}%</strong></p>
+            <div class="conf-bg"><div class="conf-fill" style="width:{{ record.confidence|floatformat:0 }}%;background:#ef4444;"></div></div>
+        </td>
+        <td class="dx-badge"><span class="badge-pill" style="background:#ef4444;">&#9888; MI</span></td>
+    </tr>
+</table>
+{% else %}
+<table class="dx-table" style="background:#e0f2fe;border:1.5px solid #0ea5e9;">
+    <tr>
+        <td class="dx-main">
+            <p class="dx-cat" style="color:#0c4a6e;">Primary Diagnosis</p>
+            <p class="dx-name" style="color:#0c4a6e;">Post MI History</p>
+            <p class="dx-conf" style="color:#0c4a6e;">AI Confidence: <strong>{{ record.confidence|floatformat:1 }}%</strong></p>
+            <div class="conf-bg"><div class="conf-fill" style="width:{{ record.confidence|floatformat:0 }}%;background:#0ea5e9;"></div></div>
+        </td>
+        <td class="dx-badge"><span class="badge-pill" style="background:#0ea5e9;">&#8505; Post MI</span></td>
+    </tr>
+</table>
+{% endif %}
+
+
+<!-- ── Two-column: Record Details | Probability Breakdown ─────────────────── -->
+<table class="two-col">
+    <tr>
+        <!-- LEFT: Record Details -->
+        <td class="col-left">
+            <p class="sec-title">Record Details</p>
+            <table class="det-table">
+                <tr><td class="det-lbl">Record ID</td>    <td class="det-val">#{{ record.id }}</td></tr>
+                <tr><td class="det-lbl">Date &amp; Time</td><td class="det-val">{{ record.upload_date|date:"d M Y, H:i" }}</td></tr>
+                <tr><td class="det-lbl">Uploaded By</td>  <td class="det-val">{{ record.user.get_full_name|default:record.user.username }}</td></tr>
+                {% if patient_name %}
+                <tr><td class="det-lbl">Patient</td>
+                    <td class="det-val">{{ patient_name }}{% if patient_age %} (Age: {{ patient_age }}){% endif %}</td></tr>
+                {% endif %}
+                {% if record.patient.gender %}
+                <tr><td class="det-lbl">Gender</td>       <td class="det-val">{{ record.patient.get_gender_display }}</td></tr>
+                {% endif %}
+                {% if record.patient.contact_number %}
+                <tr><td class="det-lbl">Contact</td>      <td class="det-val">{{ record.patient.contact_number }}</td></tr>
+                {% endif %}
+                <tr><td class="det-lbl">Diagnosis</td>
+                    <td class="det-val">
+                        {% if record.predicted_category == 'normal' %}
+                            <span style="background:#d1fae5;color:#065f46;border:1px solid #10b981;border-radius:3px;padding:1px 7px;font-weight:bold;">Normal ECG</span>
+                        {% elif record.predicted_category == 'abnormal' %}
+                            <span style="background:#fef3c7;color:#92400e;border:1px solid #f59e0b;border-radius:3px;padding:1px 7px;font-weight:bold;">Abnormal Heartbeat</span>
+                        {% elif record.predicted_category == 'mi' %}
+                            <span style="background:#fee2e2;color:#991b1b;border:1px solid #ef4444;border-radius:3px;padding:1px 7px;font-weight:bold;">Myocardial Infarction</span>
+                        {% else %}
+                            <span style="background:#e0f2fe;color:#0c4a6e;border:1px solid #0ea5e9;border-radius:3px;padding:1px 7px;font-weight:bold;">Post MI History</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr><td class="det-lbl">AI Confidence</td><td class="det-val"><strong>{{ record.confidence|floatformat:1 }}%</strong></td></tr>
+                <tr><td class="det-lbl">Status</td>       <td class="det-val">{{ record.get_status_display }}</td></tr>
+                {% if record.notes %}
+                <tr><td class="det-lbl">Notes</td>        <td class="det-val">{{ record.notes }}</td></tr>
+                {% endif %}
+                {% if record.patient.medical_history %}
+                <tr><td class="det-lbl">Med. History</td> <td class="det-val">{{ record.patient.medical_history }}</td></tr>
+                {% endif %}
+            </table>
+        </td>
+
+        <!-- RIGHT: Probability Breakdown -->
+        <td class="col-right">
+            <p class="sec-title">Probability Breakdown</p>
+            <table class="prob-table">
+                <tr>
+                    <td class="prob-lbl">Normal ECG</td>
+                    <td class="prob-bar"><div class="prob-bg"><div class="prob-fill" style="width:{{ record.normal_prob|floatformat:0 }}%;background:#10b981;"></div></div></td>
+                    <td class="prob-pct">{{ record.normal_prob|floatformat:1 }}%</td>
+                </tr>
+                <tr>
+                    <td class="prob-lbl">Abnormal Heartbeat</td>
+                    <td class="prob-bar"><div class="prob-bg"><div class="prob-fill" style="width:{{ record.abnormal_prob|floatformat:0 }}%;background:#f59e0b;"></div></div></td>
+                    <td class="prob-pct">{{ record.abnormal_prob|floatformat:1 }}%</td>
+                </tr>
+                <tr>
+                    <td class="prob-lbl">Myocardial Infarction</td>
+                    <td class="prob-bar"><div class="prob-bg"><div class="prob-fill" style="width:{{ record.mi_prob|floatformat:0 }}%;background:#ef4444;"></div></div></td>
+                    <td class="prob-pct">{{ record.mi_prob|floatformat:1 }}%</td>
+                </tr>
+                <tr>
+                    <td class="prob-lbl">Post MI History</td>
+                    <td class="prob-bar"><div class="prob-bg"><div class="prob-fill" style="width:{{ record.post_mi_prob|floatformat:0 }}%;background:#0ea5e9;"></div></div></td>
+                    <td class="prob-pct">{{ record.post_mi_prob|floatformat:1 }}%</td>
+                </tr>
+            </table>
+
+            {% if record.doctor_notes %}
+            <p class="sec-title" style="margin-top:8px;">Physician Notes</p>
+            <p style="font-size:8pt;color:#334155;margin:0;line-height:1.5;">{{ record.doctor_notes }}</p>
             {% endif %}
-            <tr>
-                <th>Uploaded By</th>
-                <td>{{ record.user.get_full_name|default:record.user.username }}</td>
-            </tr>
-            <tr>
-                <th>Primary Diagnosis</th>
-                <td>
-                    {% if record.predicted_category == 'normal' %}
-                    <span class="badge badge-success">Normal ECG</span>
-                    {% elif record.predicted_category == 'abnormal' %}
-                    <span class="badge badge-warning">Abnormal Heartbeat</span>
-                    {% elif record.predicted_category == 'mi' %}
-                    <span class="badge badge-danger">Myocardial Infarction</span>
-                    {% else %}
-                    <span class="badge badge-info">Post MI History</span>
-                    {% endif %}
-                </td>
-            </tr>
-            <tr>
-                <th>AI Confidence</th>
-                <td><strong>{{ record.confidence|floatformat:1 }}%</strong></td>
-            </tr>
-            {% if record.notes %}
-            <tr>
-                <th>Notes</th>
-                <td>{{ record.notes }}</td>
-            </tr>
-            {% endif %}
-        </table>
-    </div>
 
-    <!-- ── Probability Breakdown ─────────────────────────────────────────────── -->
-    <div class="section">
-        <h2 class="section-title">Probability Breakdown</h2>
-        <table class="prob-table">
-            {% for label, prob in probabilities.items %}
-            <tr>
-                <td class="prob-label">{{ label }}</td>
-                <td class="prob-bar-cell">
-                    <div class="prob-bar-bg">
-                        <div class="prob-bar-fill"
-                            style="width: {{ prob|floatformat:0 }}%;
-                                    background-color: {% if label == 'Normal ECG' %}#10b981{% elif label == 'Abnormal Heartbeat' %}#f59e0b{% elif label == 'Myocardial Infarction' %}#ef4444{% else %}#0ea5e9{% endif %};">
-                        </div>
-                    </div>
-                </td>
-                <td class="prob-pct">{{ prob|floatformat:1 }}%</td>
-            </tr>
-            {% endfor %}
-        </table>
-    </div>
-
-    <!-- ── Original ECG Image ────────────────────────────────────────────────── -->
-    <div class="section">
-        <h2 class="section-title">Original ECG Image</h2>
-        <div class="img-container">
+            <!-- ECG Image inside right column so it stays on page 1 -->
             {% if ecg_image_path %}
-            {# file:/// prefix lets xhtml2pdf read the image from disk on both Windows and Linux #}
-            <img src="file:///{{ ecg_image_path }}" alt="Original ECG" />
-            {% else %}
-            <p style="color:#94a3b8;">Image not available.</p>
+            <p class="sec-title" style="margin-top:8px;">Original ECG Image</p>
+            <div class="ecg-box">
+                <img src="file:///{{ ecg_image_path }}" alt="Original ECG" />
+                <p class="ecg-cap">Record #{{ record.id }} &mdash; {{ record.upload_date|date:"d M Y" }}</p>
+            </div>
             {% endif %}
-        </div>
-    </div>
+        </td>
+    </tr>
+</table>
 
-    <!-- ── LIME Explainability ───────────────────────────────────────────────── -->
-    {% if lime_ready %}
-    <pdf:nextpage />
 
-    <div class="section">
-        <h2 class="section-title">Explainable AI (LIME) Analysis</h2>
-        <p style="font-size: 9pt; color: #64748b; margin-bottom: 12px;">
-            The images below highlight the regions of the ECG that influenced the AI model's decision for each class.
-            <strong>Green areas</strong> strongly support the corresponding diagnosis,
-            while <strong>Red areas</strong> contradict it.
-        </p>
 
-        <table class="lime-grid">
-            <tr>
-                <td>
-                    <div class="lime-title">
-                        Predicted: {{ record.get_predicted_category_display }}
-                    </div>
-                    {% if record.predicted_category == 'normal' and lime_normal %}
-                    <img src="file:///{{ lime_normal }}" alt="LIME Normal" />
-                    {% elif record.predicted_category == 'abnormal' and lime_abnormal %}
-                    <img src="file:///{{ lime_abnormal }}" alt="LIME Abnormal" />
-                    {% elif record.predicted_category == 'mi' and lime_mi %}
-                    <img src="file:///{{ lime_mi }}" alt="LIME MI" />
-                    {% elif record.predicted_category == 'post_mi' and lime_post_mi %}
-                    <img src="file:///{{ lime_post_mi }}" alt="LIME Post MI" />
-                    {% else %}
-                    <p style="color:#94a3b8;font-size:8.5pt;">Explanation not yet generated.</p>
-                    {% endif %}
-                </td>
-                <td>
-                    <div class="lime-title">
-                        Alternative: {% if record.predicted_category != 'normal' %}Normal ECG{% else %}Abnormal
-                        Heartbeat{% endif %}
-                    </div>
-                    {% if record.predicted_category != 'normal' and lime_normal %}
-                    <img src="file:///{{ lime_normal }}" alt="LIME Normal" />
-                    {% elif record.predicted_category == 'normal' and lime_abnormal %}
-                    <img src="file:///{{ lime_abnormal }}" alt="LIME Abnormal" />
-                    {% else %}
-                    <p style="color:#94a3b8;font-size:8.5pt;">Not generated.</p>
-                    {% endif %}
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <div class="lime-title">Myocardial Infarction</div>
-                    {% if lime_mi %}
-                    <img src="file:///{{ lime_mi }}" alt="LIME MI" />
-                    {% else %}
-                    <p style="color:#94a3b8;font-size:8.5pt;">Not generated.</p>
-                    {% endif %}
-                </td>
-                <td>
-                    <div class="lime-title">Post MI History</div>
-                    {% if lime_post_mi %}
-                    <img src="file:///{{ lime_post_mi }}" alt="LIME Post MI" />
-                    {% else %}
-                    <p style="color:#94a3b8;font-size:8.5pt;">Not generated.</p>
-                    {% endif %}
-                </td>
-            </tr>
-        </table>
-    </div>
-    {% endif %}
 
-    <!-- ── Disclaimer ────────────────────────────────────────────────────────── -->
-    <div class="disclaimer">
-        <strong>Medical Disclaimer:</strong> This report is automatically generated by an AI-assisted analysis tool
-        and is intended for informational purposes only. It should not be used as a substitute for professional
-        medical diagnosis, advice, or treatment. Always consult a qualified healthcare professional.
-    </div>
+<!-- ── Disclaimer ─────────────────────────────────────────────────────────── -->
+<div class="disclaimer">
+    <strong>Medical Disclaimer:</strong> This report is generated by an AI-assisted tool
+    for informational purposes only. It must not replace professional medical diagnosis,
+    advice, or treatment. Always consult a qualified healthcare professional.
+</div>
 
-    <!-- ── Footer ────────────────────────────────────────────────────────────── -->
-    <div class="footer">
-        <p>Generated by CardioVision AI &nbsp;|&nbsp; Report #{{ record.id }} &nbsp;|&nbsp; {{
-            record.upload_date|date:"Y-m-d H:i" }}</p>
-    </div>
+<!-- ── Footer ─────────────────────────────────────────────────────────────── -->
+<div class="footer">
+    CardioVision AI &nbsp;&bull;&nbsp; Report #{{ record.id }} &nbsp;&bull;&nbsp;
+    {{ record.upload_date|date:"Y-m-d H:i" }} &nbsp;&bull;&nbsp; Page <pdf:pagenumber> of <pdf:pagecount>
+</div>
+
+
+<!-- ═══ PAGE 2 — LIME (only if available) ════════════════════════════════════ -->
+{% if lime_ready %}
+<pdf:nextpage />
+
+<table class="hdr-table">
+    <tr>
+        <td class="hdr-left">
+            <p class="hdr-logo">&#10084; CardioVision AI</p>
+            <p class="hdr-sub">Explainable AI (LIME) Analysis</p>
+        </td>
+        <td class="hdr-right">
+            <span class="hdr-meta">Report #{{ record.id }} &mdash; Page 2</span>
+        </td>
+    </tr>
+</table>
+<hr class="hdr-line">
+
+<p class="sec-title">LIME Explainability Heatmaps</p>
+<p style="font-size:8pt;color:#475569;margin:0 0 8px;line-height:1.6;">
+    The heatmaps below highlight which ECG regions drove the AI model's prediction.
+    <strong style="color:#10b981;">Green</strong> = supports that class &nbsp;|&nbsp;
+    <strong style="color:#ef4444;">Red</strong> = argues against it.
+</p>
+
+<table class="lime-grid">
+    <tr>
+        <td>
+            <p class="lime-lbl">&#9670; Predicted: {{ record.get_predicted_category_display }}</p>
+            {% if record.predicted_category == 'normal' and lime_normal %}
+                <img src="file:///{{ lime_normal }}" alt="LIME Normal" />
+            {% elif record.predicted_category == 'abnormal' and lime_abnormal %}
+                <img src="file:///{{ lime_abnormal }}" alt="LIME Abnormal" />
+            {% elif record.predicted_category == 'mi' and lime_mi %}
+                <img src="file:///{{ lime_mi }}" alt="LIME MI" />
+            {% elif record.predicted_category == 'post_mi' and lime_post_mi %}
+                <img src="file:///{{ lime_post_mi }}" alt="LIME Post MI" />
+            {% else %}
+                <p class="lime-note">Not yet generated.</p>
+            {% endif %}
+        </td>
+        <td>
+            <p class="lime-lbl">&#9671; Contrast: {% if record.predicted_category != 'normal' %}Normal ECG{% else %}Abnormal Heartbeat{% endif %}</p>
+            {% if record.predicted_category != 'normal' and lime_normal %}
+                <img src="file:///{{ lime_normal }}" alt="LIME Normal contrast" />
+            {% elif record.predicted_category == 'normal' and lime_abnormal %}
+                <img src="file:///{{ lime_abnormal }}" alt="LIME Abnormal contrast" />
+            {% else %}
+                <p class="lime-note">Not generated.</p>
+            {% endif %}
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <p class="lime-lbl">&#9670; Myocardial Infarction</p>
+            {% if lime_mi %}<img src="file:///{{ lime_mi }}" alt="LIME MI" />
+            {% else %}<p class="lime-note">Not generated.</p>{% endif %}
+        </td>
+        <td>
+            <p class="lime-lbl">&#9671; Post MI History</p>
+            {% if lime_post_mi %}<img src="file:///{{ lime_post_mi }}" alt="LIME Post MI" />
+            {% else %}<p class="lime-note">Not generated.</p>{% endif %}
+        </td>
+    </tr>
+</table>
+
+<div class="disclaimer" style="margin-top:14px;">
+    <strong>Medical Disclaimer:</strong> This AI-assisted report is for informational use only.
+    Always consult a qualified healthcare professional for clinical decisions.
+</div>
+
+<div class="footer">
+    CardioVision AI &nbsp;&bull;&nbsp; Report #{{ record.id }} &nbsp;&bull;&nbsp;
+    LIME Analysis &nbsp;&bull;&nbsp; Page <pdf:pagenumber> of <pdf:pagecount>
+</div>
+{% endif %}
 
 </body>
-
 </html>
