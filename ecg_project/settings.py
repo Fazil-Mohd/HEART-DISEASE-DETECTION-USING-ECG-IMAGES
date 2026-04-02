@@ -82,38 +82,6 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# ── ML MODEL CONFIGURATION ─────────────────────────────────────────────────────
-ML_CONFIG = {
-    'MODEL_PATH': BASE_DIR / 'ecg_model.h5',
-    'LABEL_ENCODER_PATH': BASE_DIR / 'label_encoder.pkl',
-    'CLASS_NAMES_PATH': BASE_DIR / 'class_names.txt',
-    'TRAINING_HISTORY_PATH': BASE_DIR / 'training_history.png',
-    'DATASET_PATH': BASE_DIR / 'data',
-
-    'CLASS_DISPLAY_NAMES': [
-        'Normal ECG',
-        'Abnormal Heartbeat',
-        'Myocardial Infarction',
-        'Post MI History',
-    ],
-
-    'FOLDER_TO_CLASS': {
-        'normal_ecg_images':              'normal',
-        'abnormal_heartbeat_ecg_images':  'abnormal',
-        'myocardial_infarction_ecg_images': 'mi',
-        'post_mi_history_ecg_images':     'post_mi',
-    },
-
-    'DATASET_FOLDERS': [
-        'normal_ecg_images',
-        'abnormal_heartbeat_ecg_images',
-        'myocardial_infarction_ecg_images',
-        'post_mi_history_ecg_images',
-    ],
-
-    'CLASS_LABELS': ['normal', 'abnormal', 'mi', 'post_mi'],
-}
-
 # ── AUTHENTICATION ─────────────────────────────────────────────────────────────
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
