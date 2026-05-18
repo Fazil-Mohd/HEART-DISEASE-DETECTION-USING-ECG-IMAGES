@@ -4,7 +4,7 @@
 # ──────────────────────────────────────────────────────────────
 
 # ── Deep Learning ──────────────────────────────────────────────
-tensorflow>=2.15.0,<2.20.0   # 2.20.0 not on Linux PyPI — resolves to 2.18.x on Render
+tensorflow>=2.16.0,<2.20.0   # 2.16+ supports numpy 2.x; resolves to 2.18.x on Linux
 keras>=3.0.0                 # let pip pick compatible keras for the resolved tensorflow
 h5py==3.15.1
 
