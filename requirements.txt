@@ -10,7 +10,7 @@ h5py==3.15.1
 
 # ── ML / Data Science ─────────────────────────────────────────
 scikit-learn==1.7.2          # compute_class_weight in ml_model.train_model()
-numpy==2.2.6                 # array ops in ml_model.py, utils.py, tasks.py
+numpy>=2.0.0,<2.1.0          # must be >=2 (opencv) AND <2.1 (tensorflow 2.18)
 pandas==2.3.3
 scipy==1.15.3
 
