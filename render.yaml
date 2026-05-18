@@ -62,9 +62,9 @@ services:
       # ALLOWED_HOSTS         → your-app.onrender.com
       # EMAIL_HOST_USER       → fazilhp11@gmail.com
       # EMAIL_HOST_PASSWORD   → your NEW Gmail App Password (16 chars)
-      # HF_MODEL_REPO         → your-hf-username/ecg-resnet50
+      # HF_MODEL_REPO         → Fazil2002/ecg-resnet50   ✅ already set — public repo
       # HF_MODEL_FILENAME     → resnet50_ecg_best.keras   (optional, this is the default)
-      # HF_TOKEN              → only needed if your HF repo is private
+      # HF_TOKEN              → NOT needed — repo is public
 
   # ── Celery Background Worker ───────────────────────────────────────────────
   - type: worker
