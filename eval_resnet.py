@@ -106,7 +106,7 @@ model.compile(
     loss=FocalLoss(gamma=2.0, label_smoothing=0.05),
     metrics=['accuracy']
 )
-print("Model loaded ✓")
+print("Model loaded OK")
 
 # ── Evaluate ──────────────────────────────────────────────────────────────────
 print("\n[STEP 1] Evaluating on validation set …")

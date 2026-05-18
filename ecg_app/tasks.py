@@ -243,7 +243,7 @@ def _generate_result_image(record):
         plt.savefig(
             buf,
             format='png',
-            dpi=150,
+            dpi=100,           # 100 dpi is sharp enough for email; was 150 (larger file, slower SMTP)
             bbox_inches='tight',
             facecolor='#0f172a',
             edgecolor='none'

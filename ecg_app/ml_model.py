@@ -325,8 +325,8 @@ class MemoryEfficientECGModel:
                 predict_fn,
                 top_labels=4,
                 hide_color=0,
-                num_samples=1000,
-                batch_size=32,
+                num_samples=200,   # 200 gives fast+accurate results; raise to 300 for more precision
+                batch_size=64,    # larger batch = more throughput per CPU pass
             )
 
             # ── 4 & 5. Build and save overlays for ALL 4 classes ─────────────────
@@ -338,7 +338,7 @@ class MemoryEfficientECGModel:
                     temp_img, mask = explanation.get_image_and_mask(
                         class_idx,
                         positive_only=False,
-                        num_features=15,
+                        num_features=10,   # 10 superpixels is enough for clear visual explanation
                         hide_rest=False,
                     )
                 except KeyError:

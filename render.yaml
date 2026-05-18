@@ -1,0 +1,97 @@
+# render.yaml — Render.com Infrastructure-as-Code
+# Docs: https://render.com/docs/blueprint-spec
+#
+# This file provisions:
+#   • 1 Web Service  (Django + gunicorn)
+#   • 1 Background Worker  (Celery)
+#   • 1 Redis instance  (broker + result backend)
+#   • 1 PostgreSQL database
+#
+# Deploy steps:
+#   1. Push this file to your GitHub repo
+#   2. Go to https://dashboard.render.com → "New Blueprint"
+#   3. Connect your GitHub repo and click "Apply"
+#   4. Add secret environment variables in the Render dashboard (see below)
+
+databases:
+  - name: ecg-postgres
+    databaseName: ecg_db
+    user: ecg_user
+    plan: free
+
+services:
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  - type: redis
+    name: ecg-redis
+    plan: free
+    ipAllowList: []  # only internal services can connect
+
+  # ── Django Web Service ─────────────────────────────────────────────────────
+  - type: web
+    name: ecg-web
+    runtime: python
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn ecg_project.wsgi --workers 2 --timeout 120 --log-file -"
+    healthCheckPath: /
+
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: ecg_project.settings
+
+      - key: DJANGO_DEBUG
+        value: "False"
+
+      # Auto-linked from the PostgreSQL database defined above
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ecg-postgres
+          property: connectionString
+
+      # Auto-linked from the Redis service defined above
+      - key: REDIS_URL
+        fromService:
+          name: ecg-redis
+          type: redis
+          property: connectionString
+
+      # ── Secrets — add these manually in the Render Dashboard ──────────────
+      # Go to: Dashboard → ecg-web → Environment → Add Environment Variable
+      #
+      # DJANGO_SECRET_KEY     → generate at https://djecrety.ir/
+      # ALLOWED_HOSTS         → your-app.onrender.com
+      # EMAIL_HOST_USER       → fazilhp11@gmail.com
+      # EMAIL_HOST_PASSWORD   → your NEW Gmail App Password (16 chars)
+      # HF_MODEL_REPO         → your-hf-username/ecg-resnet50
+      # HF_MODEL_FILENAME     → resnet50_ecg_best.keras   (optional, this is the default)
+      # HF_TOKEN              → only needed if your HF repo is private
+
+  # ── Celery Background Worker ───────────────────────────────────────────────
+  - type: worker
+    name: ecg-celery-worker
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "celery -A ecg_project worker -l info --pool=solo --concurrency=1"
+
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: ecg_project.settings
+
+      - key: DJANGO_DEBUG
+        value: "False"
+
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ecg-postgres
+          property: connectionString
+
+      - key: REDIS_URL
+        fromService:
+          name: ecg-redis
+          type: redis
+          property: connectionString
+
+      # Same secrets as the web service — add via Render dashboard
+      # DJANGO_SECRET_KEY, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD,
+      # HF_MODEL_REPO, HF_MODEL_FILENAME, HF_TOKEN

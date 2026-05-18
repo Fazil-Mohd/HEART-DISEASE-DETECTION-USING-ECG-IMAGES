@@ -463,8 +463,17 @@ def ecg_result_view(request, ecg_id):
     trend_points = []
 
     if ecg_record.patient:
+        # Clinic workflow: compare within the same patient's records
         previous_ecg = ECGRecord.objects.filter(
-            patient=ecg_record.patient, 
+            patient=ecg_record.patient,
+            upload_date__lt=ecg_record.upload_date,
+            status='completed'
+        ).order_by('-upload_date').first()
+
+    if not previous_ecg:
+        # Fallback for all users: compare against their own previous ECG
+        previous_ecg = ECGRecord.objects.filter(
+            user=ecg_record.user,
             upload_date__lt=ecg_record.upload_date,
             status='completed'
         ).order_by('-upload_date').first()
