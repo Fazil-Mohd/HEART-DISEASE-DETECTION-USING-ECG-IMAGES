@@ -4,8 +4,8 @@
 # ──────────────────────────────────────────────────────────────
 
 # ── Deep Learning ──────────────────────────────────────────────
-tensorflow==2.20.0
-keras==3.12.1                # bundled with tensorflow; explicit pin for clarity
+tensorflow>=2.15.0,<2.20.0   # 2.20.0 not on Linux PyPI — resolves to 2.18.x on Render
+keras>=3.0.0                 # let pip pick compatible keras for the resolved tensorflow
 h5py==3.15.1
 
 # ── ML / Data Science ─────────────────────────────────────────
