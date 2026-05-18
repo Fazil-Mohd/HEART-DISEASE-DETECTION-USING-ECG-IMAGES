@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# build.sh — Render build script
-# Render runs this script every time you push a new deployment.
-# Set this as the "Build Command" in your Render web service settings.
-
-set -e  # exit immediately on any error
+set -e
 
 echo "==> Installing Python dependencies …"
 pip install -r requirements.txt
+
+echo "==> Downloading ML model from Hugging Face Hub …"
+python download_model.py
 
 echo "==> Collecting static files …"
 python manage.py collectstatic --noinput
