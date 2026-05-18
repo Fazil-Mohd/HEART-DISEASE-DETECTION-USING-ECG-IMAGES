@@ -4,21 +4,23 @@ from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
 from .models import ECGRecord, Patient, UserProfile
 
+# Optional DNS validation — gracefully disabled if dnspython is not installed
+try:
+    import dns.resolver as _dns_resolver
+except ImportError:
+    _dns_resolver = None
+
 
 def validate_email_domain(email):
     """
     Checks that the email's domain has real, working MX (mail) records.
-    - NXDOMAIN           -> domain doesn't exist        -> reject
-    - NoAnswer           -> no MX record at all          -> reject
-    - MX -> localhost/.  -> broken/placeholder MX        -> reject
-    - Timeout/network    -> allow (don't block on blip)
+    Skipped silently if dnspython is not installed.
     """
-    if not email:
+    if not email or _dns_resolver is None:
         return
     domain = email.split('@')[-1]
     try:
-        import dns.resolver
-        answers = dns.resolver.resolve(domain, 'MX', lifetime=5)
+        answers = _dns_resolver.resolve(domain, 'MX', lifetime=5)
 
         # Reject placeholder MX records (localhost / null MX '.')
         invalid_targets = {'localhost', 'localhost.', '.'}
@@ -32,12 +34,12 @@ def validate_email_domain(email):
                 f'Please enter a valid email address (e.g. name@gmail.com).'
             )
 
-    except dns.resolver.NXDOMAIN:
+    except _dns_resolver.NXDOMAIN:
         raise forms.ValidationError(
             f'The domain "{domain}" does not exist. '
             f'Please enter a valid email address (e.g. name@gmail.com).'
         )
-    except dns.resolver.NoAnswer:
+    except _dns_resolver.NoAnswer:
         raise forms.ValidationError(
             f'The domain "{domain}" does not appear to accept email. '
             f'Please enter a valid email address.'
@@ -46,8 +48,8 @@ def validate_email_domain(email):
         raise   # re-raise our own error
     except Exception:
         # Network timeout or DNS unavailable — accept the address
-        # so a connectivity blip never blocks a legitimate user.
         pass
+
 
 
 class UserRegisterForm(UserCreationForm):
