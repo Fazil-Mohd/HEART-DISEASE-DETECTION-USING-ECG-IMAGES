@@ -1,58 +1,20 @@
-# forms.py - CORRECTED with 'image' field
+# forms.py
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
 from .models import ECGRecord, Patient, UserProfile
 
-# Optional DNS validation — gracefully disabled if dnspython is not installed
-try:
-    import dns.resolver as _dns_resolver
-except ImportError:
-    _dns_resolver = None
-
 
 def validate_email_domain(email):
     """
-    Checks that the email's domain has real, working MX (mail) records.
-    Skipped silently if dnspython is not installed.
+    DNS MX validation disabled — caused 5-second timeouts on Render free tier.
+    Email format + uniqueness are validated by Django's EmailField and clean_email().
     """
-    if not email or _dns_resolver is None:
-        return
-    domain = email.split('@')[-1]
-    try:
-        answers = _dns_resolver.resolve(domain, 'MX', lifetime=5)
-
-        # Reject placeholder MX records (localhost / null MX '.')
-        invalid_targets = {'localhost', 'localhost.', '.'}
-        all_invalid = all(
-            str(r.exchange).rstrip('.').lower() in invalid_targets
-            for r in answers
-        )
-        if all_invalid:
-            raise forms.ValidationError(
-                f'The domain "{domain}" does not have a working mail server. '
-                f'Please enter a valid email address (e.g. name@gmail.com).'
-            )
-
-    except _dns_resolver.NXDOMAIN:
-        raise forms.ValidationError(
-            f'The domain "{domain}" does not exist. '
-            f'Please enter a valid email address (e.g. name@gmail.com).'
-        )
-    except _dns_resolver.NoAnswer:
-        raise forms.ValidationError(
-            f'The domain "{domain}" does not appear to accept email. '
-            f'Please enter a valid email address.'
-        )
-    except forms.ValidationError:
-        raise   # re-raise our own error
-    except Exception:
-        # Network timeout or DNS unavailable — accept the address
-        pass
-
+    return  # no-op
 
 
 class UserRegisterForm(UserCreationForm):
+
     email = forms.EmailField(
         required=True,
         widget=forms.EmailInput(attrs={
