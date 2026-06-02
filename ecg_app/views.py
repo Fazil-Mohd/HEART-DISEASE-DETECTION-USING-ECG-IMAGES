@@ -33,62 +33,74 @@ def register_view(request):
     if request.method == 'POST':
         form = UserRegisterForm(request.POST)
         if form.is_valid():
-            # Create user but leave inactive until email is verified
-            user = form.save(commit=False)
-            user.is_active = False
-            user.save()
-
-            role = form.cleaned_data.get('role', 'user')
-            UserProfile.objects.create(user=user, role=role)
-
-            # Create verification token
-            from .models import EmailVerificationToken
-            token_obj = EmailVerificationToken.objects.create(user=user)
-
-            # Build the absolute verification URL
-            verification_url = request.build_absolute_uri(
-                f'/verify-email/{token_obj.token}/'
-            )
-
-            # ── Try Celery first; fall back to synchronous send ──────────────
-            email_sent = False
             try:
-                from .tasks import send_verification_email_task
-                send_verification_email_task.delay(user.id, verification_url)
-                email_sent = True
-            except Exception as celery_err:
-                import logging
-                logging.getLogger(__name__).warning(
-                    f"Celery unavailable ({celery_err}), falling back to sync email."
+                # Create user but leave inactive until email is verified
+                user = form.save(commit=False)
+                user.is_active = False
+                user.save()
+
+                role = form.cleaned_data.get('role', 'user')
+                UserProfile.objects.create(user=user, role=role)
+
+                # Create verification token
+                from .models import EmailVerificationToken
+                token_obj = EmailVerificationToken.objects.create(user=user)
+
+                # Build the absolute verification URL
+                verification_url = request.build_absolute_uri(
+                    f'/verify-email/{token_obj.token}/'
                 )
 
-            if not email_sent:
-                # Synchronous fallback — sends inline without Celery
-                from .tasks import _send_verification_email_sync
+                # ── Try Celery first; fall back to synchronous send ──────────────
+                email_sent = False
                 try:
-                    _send_verification_email_sync(user, verification_url)
+                    from .tasks import send_verification_email_task
+                    send_verification_email_task.delay(user.id, verification_url)
                     email_sent = True
-                except Exception as mail_err:
+                except Exception as celery_err:
                     import logging
-                    logging.getLogger(__name__).error(
-                        f"Sync verification email also failed: {mail_err}"
+                    logging.getLogger(__name__).warning(
+                        f"Celery unavailable ({celery_err}), falling back to sync email."
                     )
 
-            # Store the email in session for display on the pending page
-            request.session['pending_verification_email'] = user.email
+                if not email_sent:
+                    from .tasks import _send_verification_email_sync
+                    try:
+                        _send_verification_email_sync(user, verification_url)
+                        email_sent = True
+                    except Exception as mail_err:
+                        import logging
+                        logging.getLogger(__name__).error(
+                            f"Sync verification email also failed: {mail_err}"
+                        )
 
-            messages.success(
-                request,
-                f'Account created! A verification link has been sent to {user.email}. '
-                f'Please check your inbox (and spam folder) to activate your account.'
-            )
-            return redirect('email_pending')
+                # Store the email in session for display on the pending page
+                request.session['pending_verification_email'] = user.email
+
+                messages.success(
+                    request,
+                    f'Account created! A verification link has been sent to {user.email}. '
+                    f'Please check your inbox (and spam folder) to activate your account.'
+                )
+                return redirect('email_pending')
+
+            except Exception as reg_err:
+                import logging
+                import traceback
+                logging.getLogger(__name__).error(
+                    f"Registration failed unexpectedly: {reg_err}\n{traceback.format_exc()}"
+                )
+                messages.error(
+                    request,
+                    'Registration failed due to a server error. Please try again in a moment.'
+                )
         else:
             messages.error(request, 'Please correct the errors below.')
     else:
         form = UserRegisterForm()
 
     return render(request, 'ecg_app/auth/register.html', {'form': form})
+
 
 
 def login_view(request):
