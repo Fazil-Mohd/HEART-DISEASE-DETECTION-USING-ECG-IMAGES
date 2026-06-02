@@ -67,14 +67,24 @@ class UserRegisterForm(UserCreationForm):
 
     def clean_username(self):
         username = self.cleaned_data.get('username')
-        if User.objects.filter(username=username).exists():
-            raise forms.ValidationError("A user with that username already exists.")
+        existing = User.objects.filter(username=username).first()
+        if existing:
+            if not existing.is_active:
+                # Ghost account — registered but never verified. Delete and allow retry.
+                existing.delete()
+            else:
+                raise forms.ValidationError("A user with that username already exists.")
         return username
 
     def clean_email(self):
         email = self.cleaned_data.get('email')
-        if User.objects.filter(email=email).exists():
-            raise forms.ValidationError("A user with that email already exists.")
+        existing = User.objects.filter(email=email).first()
+        if existing:
+            if not existing.is_active:
+                # Ghost account — will be cleaned up; allow re-registration.
+                existing.delete()
+            else:
+                raise forms.ValidationError("A user with that email already exists.")
         validate_email_domain(email)
         return email
 
