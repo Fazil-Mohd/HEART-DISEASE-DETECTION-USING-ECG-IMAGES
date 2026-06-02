@@ -14,7 +14,8 @@ from django.contrib.auth.models import User
 
 from .forms import UserRegisterForm, UserLoginForm, UserUpdateForm, ECGUploadForm, PatientForm
 from .models import UserProfile, ECGRecord, Patient
-from .ml_model import ecg_model
+# ecg_model is imported lazily inside each view that needs it
+# to avoid loading TensorFlow (~400 MB) on every request
 from django.views.decorators.csrf import csrf_exempt
 import csv
 import os
@@ -399,6 +400,7 @@ def upload_ecg_view(request):
             ecg_record.save()
 
             try:
+                from .ml_model import ecg_model  # lazy: only load TF for predictions
                 result = ecg_model.predict(ecg_record.image.path)
 
                 if result:
@@ -683,6 +685,7 @@ def patient_delete_view(request, patient_id):
 def api_train_model(request):
     if request.method == 'POST':
         try:
+            from .ml_model import ecg_model  # lazy import
             success = ecg_model.train_model()
             if success:
                 return JsonResponse({
@@ -736,7 +739,7 @@ def api_lime_explanation(request, ecg_id):
         'is_ready':       is_ready,
         'lime_images':    record.lime_images or {},
         'lime_data':      record.lime_explanation_data or {},
-        'class_names':    ecg_model.class_names,
+        'class_names':    ['normal', 'abnormal', 'mi', 'post_mi'],
         'predicted_class': record.predicted_category,
     })
 
