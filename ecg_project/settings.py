@@ -160,6 +160,15 @@ CELERY_TASK_ACKS_LATE = True
 # Process one task at a time per worker thread — avoids memory pressure with TensorFlow
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 
+# CRITICAL: fail fast when Redis is unavailable — prevents 60-second retry loop
+# that would cause gunicorn worker timeout during registration.
+CELERY_BROKER_CONNECTION_RETRY    = False   # don't retry on startup
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 1    # at most 1 retry then give up
+CELERY_BROKER_TRANSPORT_OPTIONS   = {
+    'socket_timeout':         3,   # seconds to wait for response
+    'socket_connect_timeout': 3,   # seconds to wait for connection
+}
+
 # ── EMAIL ──────────────────────────────────────────────────────────────────────
 # All credentials are read from environment variables — never hard-coded.
 #
@@ -172,13 +181,16 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 #      Local  : add to your .env file (see .env.example)
 #      Render : add via the Render dashboard → Environment
 #
-EMAIL_BACKEND      = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST         = 'smtp.gmail.com'
-EMAIL_PORT         = 587
-EMAIL_USE_TLS      = True
-EMAIL_HOST_USER    = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST          = 'smtp.gmail.com'
+EMAIL_PORT          = 587
+EMAIL_USE_TLS       = True
+EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.environ.get('EMAIL_HOST_USER', '')
+DEFAULT_FROM_EMAIL  = os.environ.get('EMAIL_HOST_USER', '')
+# Timeout for SMTP connection — prevents gunicorn worker timeout (120s)
+# when Gmail is slow or credentials are wrong.
+EMAIL_TIMEOUT       = 10  # seconds
 
 # ── PRODUCTION SECURITY HEADERS (only when DEBUG=False) ───────────────────────
 if not DEBUG:
